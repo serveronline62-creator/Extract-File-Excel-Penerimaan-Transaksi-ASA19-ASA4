@@ -73,6 +73,10 @@
   .btn-ghost:hover{background:var(--soft)}
   .btn-ok{background:var(--ok);color:#fff}
   .btn-ok:hover{background:#047857}
+  .btn-danger{background:#fff;border-color:#fecaca;color:#b91c1c}
+  .btn-danger:hover{background:#fef2f2;border-color:#fca5a5}
+  .btn-warn{background:#fff;border-color:#fde68a;color:#b45309}
+  .btn-warn:hover{background:#fffbeb;border-color:#fcd34d}
   button:disabled{opacity:.5;cursor:not-allowed}
 
   .chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#334155;user-select:none;cursor:pointer}
@@ -94,6 +98,7 @@
   }
   .pill b{color:var(--brand2)}
   .pill.ok b{color:var(--ok)}
+  .pill.danger b{color:#b91c1c}
 
   .tablebox{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:12px;background:#fff}
   table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
@@ -115,6 +120,22 @@
     transition:.25s;pointer-events:none;z-index:99;
   }
   .toast.show{opacity:1;transform:translateY(0)}
+
+  /* modal konfirmasi */
+  .modal{
+    position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;
+    align-items:center;justify-content:center;z-index:100;padding:20px;
+  }
+  .modal.show{display:flex}
+  .modal-box{
+    background:#fff;border-radius:14px;padding:22px;max-width:440px;width:100%;
+    box-shadow:0 24px 60px rgba(0,0,0,.35);
+  }
+  .modal-box h3{margin:0 0 8px;font-size:16px}
+  .modal-box p{margin:0 0 18px;font-size:13.5px;color:#334155;line-height:1.55}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px}
+  .modal-actions .btn-ok{background:#dc2626}
+  .modal-actions .btn-ok:hover{background:#b91c1c}
 </style>
 </head>
 <body>
@@ -135,6 +156,18 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Modal konfirmasi -->
+<div class="modal" id="modalConfirm">
+  <div class="modal-box">
+    <h3 id="modalTitle">Konfirmasi</h3>
+    <p id="modalMsg">Anda yakin?</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modalCancel">Batal</button>
+      <button class="btn-ok" id="modalOk">Ya, Lanjutkan</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* =========================================================================
@@ -158,10 +191,8 @@ const TAP2_COLUMNS = [
 
 /* -------------------------------------------------------------------------
    DAFTAR KOLOM YANG DIHAPUS / TIDAK DITAMPILKAN (khusus TAP 2)
-   Mencakup seluruh permintaan pengguna.
    ------------------------------------------------------------------------- */
 const TAP2_EXCLUDED_COLUMNS = [
-  /* Daftar sebelumnya */
   "Tipe Cetak",
   "Um",
   "Qty Konversi",
@@ -174,7 +205,6 @@ const TAP2_EXCLUDED_COLUMNS = [
   "NIK Dari",
   "Nama Dari",
   "Kode Gudang Dari",
-  /* Daftar tambahan dari permintaan terbaru */
   "Lokasi Sampai",
   "Site Sampai",
   "NIK Sampai",
@@ -319,6 +349,36 @@ function toast(msg){
   toastTm = setTimeout(() => t.classList.remove("show"), 2800);
 }
 
+/* Modal konfirmasi (Promise-based) */
+function confirmDialog(title, message, okLabel){
+  return new Promise(resolve => {
+    const modal = $("modalConfirm");
+    $("modalTitle").textContent = title || "Konfirmasi";
+    $("modalMsg").textContent   = message || "Anda yakin?";
+    $("modalOk").textContent    = okLabel || "Ya, Lanjutkan";
+
+    const cleanup = (val) => {
+      modal.classList.remove("show");
+      $("modalOk").removeEventListener("click", onOk);
+      $("modalCancel").removeEventListener("click", onCancel);
+      modal.removeEventListener("click", onOverlay);
+      document.removeEventListener("keydown", onKey);
+      resolve(val);
+    };
+    const onOk      = () => cleanup(true);
+    const onCancel  = () => cleanup(false);
+    const onOverlay = e => { if (e.target === modal) cleanup(false); };
+    const onKey     = e => { if (e.key === "Escape") cleanup(false); };
+
+    $("modalOk").addEventListener("click", onOk);
+    $("modalCancel").addEventListener("click", onCancel);
+    modal.addEventListener("click", onOverlay);
+    document.addEventListener("keydown", onKey);
+    modal.classList.add("show");
+    $("modalOk").focus();
+  });
+}
+
 function findColumnIndex(headers, aliases){
   const H = headers.map(norm);
   for (const a of aliases){ if (H.includes(a)) return H.indexOf(a); }
@@ -412,6 +472,8 @@ class TabController {
 
         <div class="actions">
           <button class="btn-ghost" id="btnReset-${p}">↺ Reset Filter</button>
+          <button class="btn-warn" id="btnDelFiltered-${p}" title="Hapus baris yang sedang tampil dari data">🗑 Hapus Baris Terfilter</button>
+          <button class="btn-danger" id="btnClear-${p}" title="Hapus semua data yang sudah diunggah">🗑 Hapus Semua Data</button>
           <label class="chk"><input type="checkbox" id="chkRenumber-${p}" checked /> Nomor ulang kolom "No"</label>
           <label class="chk"><input type="checkbox" id="chkBlank-${p}" ${checkedBlank} /> Sertakan 3 baris kosong di atas header</label>
           <div style="flex:1"></div>
@@ -426,6 +488,7 @@ class TabController {
         <div class="stats">
           <div class="pill">Total baris: <b id="stTotal-${p}">0</b></div>
           <div class="pill">Setelah difilter: <b id="stFiltered-${p}">0</b></div>
+          <div class="pill danger" id="stDeleted-${p}" style="display:none">Dihapus: <b>0</b></div>
           <div class="pill">Kolom: <b id="stCols-${p}">0</b></div>
           <div class="pill ok" id="stDetail-${p}" style="display:none">Detail match: <b>0</b></div>
           <div class="pill ok" id="stGT-${p}" style="display:none">Goods Transaction match: <b>0</b></div>
@@ -473,6 +536,8 @@ class TabController {
       });
 
     this.el("btnReset").addEventListener("click", () => this.resetFilter());
+    this.el("btnDelFiltered").addEventListener("click", () => this.deleteFilteredRows());
+    this.el("btnClear").addEventListener("click", () => this.clearAllData());
     this.el("btnExport").addEventListener("click", () => this.exportExcel());
     this.el("chkRenumber").addEventListener("change", () => this.renderPreview());
   }
@@ -708,12 +773,10 @@ class TabController {
 
   /* ------------------------------------------------------------------
      AUTO-FILL: Diubah Oleh ← Dibuat Oleh, Diubah Pada ← Dibuat Pada
-     Hanya mengisi bila kolom tujuan masih kosong.
      ------------------------------------------------------------------ */
   autoFillChangedFromCreated(rows){
     let filledOleh = 0, filledPada = 0;
     rows.forEach(row => {
-      /* Diubah Oleh ← Dibuat Oleh */
       const dibuatOleh = row["Dibuat Oleh"];
       const curOleh    = row["Diubah Oleh"];
       if ((curOleh === "" || curOleh === null || curOleh === undefined) &&
@@ -722,7 +785,6 @@ class TabController {
         filledOleh++;
       }
 
-      /* Diubah Pada ← Dibuat Pada */
       const dibuatPada = row["Dibuat Pada"];
       const curPada    = row["Diubah Pada"];
       if ((curPada === "" || curPada === null || curPada === undefined) &&
@@ -766,10 +828,6 @@ class TabController {
 
     const detail = this.detectDetailSheet(sheetName);
 
-    /* -----------------------------------------------------------------
-       Bangun kolom tambahan dari Detail, KECUALI kolom yang dikecualikan
-       (khusus TAP 2: Tipe Cetak, Um, Qty Konversi, ... hingga Diupdate Pada)
-       ----------------------------------------------------------------- */
     const excludedSet = new Set(
       (this.cfg.excludedDetailColumns || []).map(norm)
     );
@@ -779,9 +837,9 @@ class TabController {
       detail.columns.forEach(c => {
         if (!c) return;
         const key = norm(c);
-        if (excludedSet.has(key)) return;                          // ← dihapus
-        if (this.cfg.columns.some(m => norm(m) === key)) return;   // sudah ada di TAP
-        if (extraDetailCols.some(x => norm(x) === key)) return;    // duplikat
+        if (excludedSet.has(key)) return;
+        if (this.cfg.columns.some(m => norm(m) === key)) return;
+        if (extraDetailCols.some(x => norm(x) === key)) return;
         extraDetailCols.push(c);
       });
     }
@@ -844,7 +902,7 @@ class TabController {
           if (v === null || v === undefined || String(v).trim() === "") return;
 
           const target = this.state.columns.find(c => norm(c) === norm(colName));
-          if (!target) return;   /* kolom yang dikecualikan akan otomatis di-skip */
+          if (!target) return;
 
           const cur = row[target];
           if (cur === "" || cur === undefined || cur === null){
@@ -897,7 +955,7 @@ class TabController {
       this.state.gtInfo = null;
     }
 
-    /* --- AUTO-FILL: Diubah Oleh ← Dibuat Oleh, Diubah Pada ← Dibuat Pada --- */
+    /* --- AUTO-FILL: Diubah ← Dibuat --- */
     this.state.autoFillInfo = this.autoFillChangedFromCreated(rows);
 
     this.state.rows = rows;
@@ -986,7 +1044,6 @@ class TabController {
         </div>`;
     }
 
-    /* --- banner info auto-fill Diubah ← Dibuat --- */
     if (af && (af.filledOleh || af.filledPada)){
       html += `
         <div class="info ok" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
@@ -1078,6 +1135,109 @@ class TabController {
     this.applyFilter();
   }
 
+  /* ------------------------------------------------------------------
+     HAPUS: baris terfilter
+     ------------------------------------------------------------------ */
+  async deleteFilteredRows(){
+    if (!this.state.rows.length){
+      toast("Belum ada data yang dimuat.");
+      return;
+    }
+    if (!this.state.filtered.length){
+      toast("Tidak ada baris terfilter untuk dihapus.");
+      return;
+    }
+
+    const jumlah = this.state.filtered.length;
+    const total  = this.state.rows.length;
+    const pesan  = (jumlah === total)
+      ? `Semua ${jumlah.toLocaleString("id-ID")} baris akan dihapus dan data akan menjadi kosong. Lanjutkan?`
+      : `Hapus ${jumlah.toLocaleString("id-ID")} baris yang sedang tampil dari total ${total.toLocaleString("id-ID")} baris?`;
+
+    const ok = await confirmDialog(
+      "Hapus Baris Terfilter",
+      pesan,
+      "Ya, Hapus"
+    );
+    if (!ok) return;
+
+    const hapus = new Set(this.state.filtered);
+    this.state.rows = this.state.rows.filter(r => !hapus.has(r));
+
+    /* catat jumlah yang dihapus untuk statistik */
+    this.state.deletedCount = (this.state.deletedCount || 0) + jumlah;
+
+    this.buildFilterOptions();
+    this.applyFilter();
+
+    /* perbarui pill "Dihapus" */
+    const pillDel = this.el("stDeleted");
+    if (pillDel){
+      pillDel.style.display = "";
+      pillDel.querySelector("b").textContent = this.state.deletedCount.toLocaleString("id-ID");
+    }
+
+    toast(`[${this.cfg.label}] ${jumlah.toLocaleString("id-ID")} baris dihapus. Sisa ${this.state.rows.length.toLocaleString("id-ID")} baris.`);
+  }
+
+  /* ------------------------------------------------------------------
+     HAPUS: seluruh data (reset total)
+     ------------------------------------------------------------------ */
+  async clearAllData(){
+    if (!this.state.wb && !this.state.rows.length){
+      toast("Belum ada data untuk dihapus.");
+      return;
+    }
+
+    const ok = await confirmDialog(
+      "Hapus Semua Data",
+      "Semua data yang sudah diunggah, hasil filter, dan pengaturan saat ini akan dihapus. Tindakan ini tidak dapat dibatalkan. Lanjutkan?",
+      "Ya, Hapus Semua"
+    );
+    if (!ok) return;
+
+    this.state.wb           = null;
+    this.state.rows         = [];
+    this.state.filtered     = [];
+    this.state.detailInfo   = null;
+    this.state.gtInfo       = null;
+    this.state.autoFillInfo = null;
+    this.state.sheetName    = "";
+    this.state.baseName     = "extract";
+    this.state.deletedCount = 0;
+
+    /* Reset UI input */
+    this.el("file").value = "";
+    this.el("sheetSelect").innerHTML = "";
+    this.el("sheetBox").classList.add("hidden");
+
+    /* Reset banner info */
+    const box = this.el("detailInfo");
+    box.innerHTML = "";
+    box.classList.add("hidden");
+
+    /* Reset filter & preview */
+    this.resetFilter();
+    this.el("filter").classList.add("hidden");
+    this.el("preview").classList.add("hidden");
+
+    /* Reset tabel */
+    this.el("thead").innerHTML = "";
+    this.el("tbody").innerHTML = "";
+    this.el("emptyMsg").classList.add("hidden");
+    this.el("limitNote").textContent = "";
+    this.el("stTotal").textContent    = "0";
+    this.el("stFiltered").textContent = "0";
+    this.el("stCols").textContent     = "0";
+    this.el("stDetail").style.display = "none";
+    this.el("stGT").style.display     = "none";
+
+    const pillDel = this.el("stDeleted");
+    if (pillDel) pillDel.style.display = "none";
+
+    toast(`[${this.cfg.label}] Semua data berhasil dihapus.`);
+  }
+
   renderPreview(){
     const thead = this.el("thead");
     const tbody = this.el("tbody");
@@ -1118,6 +1278,7 @@ class TabController {
 
   exportExcel(){
     if (!this.state.rows.length){ toast("Belum ada data untuk diekspor."); return; }
+    if (!this.state.filtered.length){ toast("Tidak ada baris yang cocok untuk diekspor."); return; }
 
     const cols      = this.state.columns;
     const renumber  = this.el("chkRenumber").checked;
