@@ -1,1200 +1,1011 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Excel Converter — ASA4 / ASA19 / ASA10</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Goods Transaction — Filter &amp; Extract</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   :root{
-    --bg:#eef2f9; --panel:#fff; --ink:#0f172a; --muted:#64748b;
-    --line:#e2e8f0; --brand:#2563eb; --brand-d:#1d4ed8; --brand-l:#eff6ff;
-    --ok:#16a34a; --warn:#f59e0b; --err:#dc2626; --r:12px;
+    --green:#217346;
+    --green-dark:#185c37;
+    --border:#d8d8d8;
+    --head:#f2f2f2;
+    --bg:#eef1f4;
+    --hl:#fff8d6;   /* highlight kolom penting */
+    --hl-border:#f0c419;
   }
-  *{box-sizing:border-box}
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
   body{
-    margin:0;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
-    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45;
+    margin:0;height:100vh;overflow:hidden;
+    display:flex;flex-direction:column;
+    font-family:Calibri,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:13px;color:#1f1f1f;background:var(--bg);
   }
+
+  /* ---------- TOPBAR ---------- */
   .topbar{
-    background:linear-gradient(120deg,#1e3a8a,#2563eb 55%,#0ea5e9);
-    color:#fff;padding:18px 24px;display:flex;align-items:center;gap:14px;
-    box-shadow:0 4px 18px rgba(15,23,42,.18);
+    display:flex;align-items:center;gap:10px;
+    padding:8px 14px;background:var(--green);color:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.18);z-index:10;
   }
-  .logo{
-    width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.18);
-    display:grid;place-items:center;font-weight:800;letter-spacing:.5px;
-    border:1px solid rgba(255,255,255,.35);flex:0 0 auto;
+  .brand{font-weight:700;font-size:15px;letter-spacing:.2px;}
+  .brand span{opacity:.75;font-weight:400;font-size:12px;margin-left:6px;}
+  .spacer{flex:1;}
+  .topbar button{
+    background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.4);
+    padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12.5px;
   }
-  .topbar h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.2px}
-  .topbar p{margin:2px 0 0;font-size:12px;opacity:.85}
+  .topbar button:hover:not(:disabled){background:rgba(255,255,255,.28);}
+  .topbar button:disabled{opacity:.45;cursor:not-allowed;}
+  .topbar button.primary{background:#fff;color:var(--green-dark);font-weight:700;border-color:#fff;}
+  .topbar button.primary:hover:not(:disabled){background:#eaf5ef;}
 
-  .wrap{max-width:1400px;margin:0 auto;padding:18px 20px 60px}
+  /* ---------- MAIN ---------- */
+  .main{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px;overflow:hidden;}
+  .card{background:#fff;border:1px solid #dfe3e8;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+  .hidden{display:none !important;}
 
-  .tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
-  .tab{
-    display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid var(--line);
-    background:var(--panel);border-radius:var(--r);padding:12px 18px;text-align:left;
-    font:inherit;color:var(--ink);transition:.18s;box-shadow:0 1px 2px rgba(15,23,42,.05);
-    flex:1 1 320px;
-  }
-  .tab:hover{border-color:#bfdbfe;transform:translateY(-1px)}
-  .tab.active{border-color:var(--brand);background:var(--brand-l);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-  .tab-num{
-    width:30px;height:30px;border-radius:9px;background:#e2e8f0;color:#334155;
-    display:grid;place-items:center;font-weight:800;flex:0 0 auto;font-size:13px;
-  }
-  .tab.active .tab-num{background:var(--brand);color:#fff}
-  .tab strong{display:block;font-size:13.5px}
-  .tab small{display:block;color:var(--muted);font-size:11.5px;font-weight:500}
-
-  .panel{
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
-    padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(15,23,42,.05);
-  }
-  .panel > h2{
-    margin:0 0 4px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;
-  }
-  .panel > h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--brand)}
-  .panel .sub{color:var(--muted);font-size:12px;margin:0 0 14px}
-
+  /* ---------- DROPZONE ---------- */
   .drop{
-    border:2px dashed #c7d2fe;border-radius:var(--r);padding:26px 18px;text-align:center;
-    background:#f8faff;cursor:pointer;transition:.18s;display:block;
+    padding:18px;text-align:center;border:2px dashed #b9c6d1;border-radius:6px;
+    background:#fbfcfd;cursor:pointer;transition:.15s;margin:10px;
   }
-  .drop:hover,.drop.over{background:#eff6ff;border-color:var(--brand)}
-  .drop .ic{font-size:24px}
-  .drop b{display:block;margin-top:6px;font-size:13.5px}
-  .drop span{color:var(--muted);font-size:12px}
-  .drop input{display:none}
-  .drop.loaded{background:#f0fdf4;border-color:#86efac}
+  .drop:hover,.drop.over{border-color:var(--green);background:#f2f9f5;}
+  .drop p{margin:4px 0;}
+  .drop .big{font-size:15px;font-weight:700;color:var(--green-dark);}
+  .muted{color:#6b7684;font-size:12px;}
+  code{background:#eef1f4;padding:1px 5px;border-radius:3px;font-size:12px;}
 
-  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
-  .field{display:flex;flex-direction:column;gap:5px}
-  .field label{font-size:11.5px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.4px}
-  .field input,.field select{
-    border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px;
-    background:#fff;color:var(--ink);outline:none;transition:.15s;width:100%;
+  .status{margin:0 12px 10px;padding:8px 12px;border-radius:4px;font-size:12.5px;}
+  .status.info{background:#eaf1fb;color:#1c4e80;border:1px solid #c9dcf5;}
+  .status.error{background:#fdecec;color:#a02020;border:1px solid #f5c6c6;}
+  .status.ok{background:#eaf7ef;color:#186b3c;border:1px solid #c3e6d1;}
+
+  /* ---------- HIGHLIGHT PANEL ---------- */
+  .hlPanel{
+    display:flex;flex-wrap:wrap;gap:12px;padding:12px;
+    background:linear-gradient(180deg,#fffbeb 0%,#fffdf5 100%);
+    border:1px solid #f0d76a;border-radius:6px;
   }
-  .field input:focus,.field select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-  .field .hint{font-size:11px;color:var(--muted)}
-  .chk{display:flex;align-items:center;gap:8px;font-size:13px;padding-top:20px}
-  .chk input{width:16px;height:16px;accent-color:var(--brand)}
-
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .btn{
-    border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;
-    padding:9px 16px;font:inherit;font-weight:600;font-size:13px;cursor:pointer;transition:.15s;
-    display:inline-flex;align-items:center;gap:7px;
+  .hlBox{
+    flex:1;min-width:260px;background:#fff;border:1px solid #f0d76a;border-radius:6px;
+    padding:10px 12px;box-shadow:0 1px 2px rgba(240,196,25,.15);
   }
-  .btn:hover{background:#f8fafc;border-color:#cbd5e1}
-  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
-  .btn.primary:hover{background:var(--brand-d);border-color:var(--brand-d)}
-  .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
-  .btn.ok:hover{filter:brightness(.93)}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-
-  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-  .stat{
-    background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:9px 14px;min-width:110px;
+  .hlBox .lbl{
+    font-size:10.5px;font-weight:800;color:#8a6d00;text-transform:uppercase;
+    letter-spacing:.5px;display:flex;align-items:center;gap:6px;margin-bottom:6px;
   }
-  .stat b{display:block;font-size:18px;line-height:1.15}
-  .stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-  .stat.g b{color:var(--ok)} .stat.b b{color:var(--brand)} .stat.w b{color:var(--warn)} .stat.r b{color:var(--err)}
-
-  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:460px;background:#fff}
-  table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;white-space:nowrap}
-  thead th{
-    position:sticky;top:0;background:#f1f5f9;z-index:2;text-align:left;padding:9px 11px;
-    font-weight:700;font-size:11.5px;color:#334155;border-bottom:1px solid var(--line);
-    text-transform:uppercase;letter-spacing:.3px;
+  .hlBox .lbl .dot{
+    width:8px;height:8px;border-radius:50%;background:var(--hl-border);
+    box-shadow:0 0 0 3px rgba(240,196,25,.25);
   }
-  tbody td{padding:7px 11px;border-bottom:1px solid #f1f5f9}
-  tbody tr:nth-child(even){background:#fafbfd}
-  tbody tr:hover{background:#eff6ff}
-  .empty{padding:28px;text-align:center;color:var(--muted);font-size:13px;
-    border:1px dashed var(--line);border-radius:10px;background:#fafbfd}
-  .note{font-size:11.5px;color:var(--muted);margin-top:8px}
+  .hlBox .val{
+    font-size:16px;font-weight:700;color:#1f1f1f;word-break:break-word;
+    font-family:Consolas,"Courier New",monospace;line-height:1.35;
+  }
+  .hlBox .val.empty{color:#a9b4bf;font-weight:400;font-style:italic;font-size:13px;}
+  .hlBox .sub{font-size:11.5px;color:#6b7684;margin-top:5px;}
+  .hlBox .sub b{color:#185c37;}
 
-  .msg{border-radius:9px;padding:10px 13px;font-size:12.5px;margin-top:10px;display:none}
-  .msg.show{display:block}
-  .msg.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
-  .msg.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
-  .msg.err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+  /* ---------- COLUMN PICKER ---------- */
+  .colBar{
+    display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+    padding:8px 12px;border-bottom:1px solid #e3e7eb;background:#fafbfc;
+  }
+  .colBar .tit{font-size:11px;font-weight:800;color:#5a6672;text-transform:uppercase;letter-spacing:.4px;margin-right:4px;}
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:3px 9px;border-radius:12px;font-size:11.5px;cursor:pointer;
+    background:#fff;border:1px solid #c9d1d9;color:#4a5561;user-select:none;
+    transition:.12s;
+  }
+  .chip:hover{border-color:#8a95a1;}
+  .chip.on{background:#e8f4ec;border-color:var(--green);color:var(--green-dark);font-weight:600;}
+  .chip.key{border-color:var(--hl-border);background:#fffbeb;}
+  .chip.key.on{background:#fdf1c2;border-color:#d9a800;color:#6b5200;font-weight:700;}
+  .chip .ck{font-size:10px;opacity:.65;}
+  .chip.on .ck{opacity:1;}
+  .colBar .actions{margin-left:auto;display:flex;gap:6px;}
+  .colBar button{
+    padding:4px 10px;border:1px solid #c9d1d9;background:#fff;border-radius:4px;
+    cursor:pointer;font-size:11.5px;font-family:inherit;color:#4a5561;
+  }
+  .colBar button:hover{background:#f3f5f7;border-color:#a9b4bf;}
 
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
-  .badge.ok{background:#dcfce7;color:#166534}
-  .badge.warn{background:#fef3c7;color:#92400e}
-  .badge.err{background:#fee2e2;color:#991b1b}
-  .badge.info{background:#dbeafe;color:#1e40af}
+  /* ---------- FILTERS ---------- */
+  .filters{display:flex;flex-wrap:wrap;gap:10px;padding:10px 12px;}
+  .f{display:flex;flex-direction:column;gap:3px;min-width:150px;}
+  .f label{font-size:11px;font-weight:700;color:#5a6672;text-transform:uppercase;letter-spacing:.3px;}
+  .f select,.f input{
+    padding:5px 7px;border:1px solid #c9d1d9;border-radius:4px;font-size:12.5px;
+    font-family:inherit;background:#fff;color:#1f1f1f;outline:none;
+  }
+  .f select:focus,.f input:focus{border-color:var(--green);box-shadow:0 0 0 2px rgba(33,115,70,.13);}
+  .f.keyFilter select,.f.keyFilter input{border-color:var(--hl-border);background:#fffdf5;}
+  button.ghost{
+    padding:6px 12px;border:1px solid #c9d1d9;background:#fff;border-radius:4px;
+    cursor:pointer;font-size:12.5px;font-family:inherit;
+  }
+  button.ghost:hover{background:#f3f5f7;border-color:#a9b4bf;}
 
-  .hide{display:none !important}
-  .two{display:grid;gap:14px;grid-template-columns:1fr 1fr}
-  @media(max-width:820px){.two{grid-template-columns:1fr}}
-  .kv{font-size:12px;color:var(--muted);margin-top:8px}
-  .kv b{color:var(--ink)}
+  /* ---------- TABLE ---------- */
+  .tableCard{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+  .tableInfo{
+    display:flex;align-items:center;gap:14px;padding:7px 12px;
+    border-bottom:1px solid #e3e7eb;background:#fafbfc;font-size:12.5px;color:#4a5561;
+  }
+  .tableInfo b{color:#1f1f1f;}
+  .tablewrap{flex:1;min-height:0;overflow:auto;background:#fff;}
+  table.xl{border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap;min-width:100%;}
+  table.xl th,table.xl td{
+    border-right:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    padding:4px 8px;text-align:left;vertical-align:top;
+  }
+  table.xl thead th{
+    position:sticky;top:0;z-index:3;
+    background:var(--head);font-weight:700;color:#1f1f1f;
+    border-top:1px solid var(--border);
+    border-bottom:2px solid #b0b8bf;
+    box-shadow:inset 0 -1px 0 #b0b8bf;
+  }
+  table.xl tbody tr:nth-child(even){background:#fcfcfd;}
+  table.xl tbody tr:hover{background:#eaf4ee;}
+
+  /* kolom penting di-highlight */
+  table.xl th.colKey{background:#fdf1c2 !important;color:#6b5200;border-bottom-color:#d9a800;}
+  table.xl td.colKey{background:var(--hl);font-weight:600;}
+  table.xl tbody tr:nth-child(even) td.colKey{background:#fdf6d8;}
+  table.xl tbody tr:hover td.colKey{background:#fbeeb0;}
+
+  table.xl td.wrap{white-space:normal;word-break:break-word;min-width:220px;}
+  table.xl td.num{text-align:right;}
+  table.xl td.gutter,table.xl th.gutter{
+    position:sticky;left:0;z-index:4;background:#f7f8f9;
+    text-align:center;color:#5a6672;font-weight:600;border-right:2px solid #cfd6dd;
+  }
+  table.xl thead th.gutter{z-index:5;background:#e9ecef;}
+  .empty{padding:40px;text-align:center;color:#8a95a1;font-size:14px;}
+  .emptyCol{padding:30px;text-align:center;color:#8a95a1;font-size:13px;}
+
+  /* ---------- MODAL ---------- */
+  .modal{
+    position:fixed;inset:0;background:rgba(15,23,32,.5);
+    display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;
+  }
+  .modal-box{
+    background:#fff;border-radius:8px;width:min(860px,100%);max-height:88vh;
+    display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.3);
+  }
+  .modal-head{
+    display:flex;align-items:center;padding:12px 16px;background:var(--green);color:#fff;
+    font-weight:700;font-size:14px;
+  }
+  .modal-head button{
+    margin-left:auto;background:transparent;border:0;color:#fff;font-size:17px;cursor:pointer;line-height:1;
+  }
+  .modal-body{flex:1;overflow:auto;padding:0;}
+  .modal-foot{
+    display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid #e3e7eb;background:#fafbfc;
+  }
+  .modal-foot .spacer{flex:1;}
+  button.primary{
+    background:var(--green);color:#fff;border:1px solid var(--green);
+    padding:7px 16px;border-radius:4px;cursor:pointer;font-weight:700;font-size:12.5px;font-family:inherit;
+  }
+  button.primary:hover{background:var(--green-dark);}
+  table.map{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.map th{
+    position:sticky;top:0;background:#f2f2f2;text-align:left;padding:8px 12px;
+    border-bottom:1px solid #d8d8d8;font-size:11px;text-transform:uppercase;color:#5a6672;letter-spacing:.3px;
+  }
+  table.map td{padding:5px 12px;border-bottom:1px solid #eef0f2;vertical-align:middle;}
+  table.map tr:hover td{background:#f8fafb;}
+  table.map select{width:100%;padding:4px 6px;border:1px solid #c9d1d9;border-radius:4px;font-size:12.5px;font-family:inherit;background:#fff;}
+  .badge{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:8px;background:#eef1f4;color:#5a6672;margin-left:6px;}
+  .badge.warn{background:#fdecec;color:#a02020;}
+  .badge.key{background:#fdf1c2;color:#6b5200;font-weight:700;}
 </style>
 </head>
 <body>
 
+<!-- ================= TOPBAR ================= -->
 <div class="topbar">
-  <div class="logo">XL</div>
-  <div>
-    <h1>Excel Converter &amp; Extractor</h1>
-    <p>ASA4 (TMR) &nbsp;•&nbsp; ASA19 (MSK) &nbsp;•&nbsp; ASA10 (RSV) — INPUT DO &amp; DATA SMARTX</p>
-  </div>
+  <div class="brand">📗 Goods Transaction Extractor <span>Filter &amp; Extract</span></div>
+  <div class="spacer"></div>
+  <button id="btnMapping" disabled>⚙ Mapping Kolom</button>
+  <button id="btnExport" class="primary" disabled>⬇ Export Excel</button>
 </div>
 
-<div class="wrap">
+<!-- ================= MAIN ================= -->
+<div class="main">
 
-  <!-- ================= TABS ================= -->
-  <div class="tabs">
-    <button class="tab active" data-tab="tab1">
-      <span class="tab-num">1</span>
-      <span>
-        <strong>CONVERTER ASA4 (TMR) + ASA19 (MSK)</strong>
-        <small>Purchase Receipt MSK → INPUT DO TMR</small>
-      </span>
-    </button>
-    <button class="tab" data-tab="tab2">
-      <span class="tab-num">2</span>
-      <span>
-        <strong>ASA4 (TMR) + ASA10 (RSV)</strong>
-        <small>INPUT DATA SMARTX</small>
-      </span>
-    </button>
+  <!-- DROPZONE -->
+  <div class="card" id="dropCard">
+    <div class="drop" id="drop">
+      <p class="big">Klik atau tarik file Excel ke sini</p>
+      <p class="muted">Format: .xlsx / .xls / .xlsm</p>
+      <p class="muted">Sumber data: sheet <code>Goods Transaction</code> &amp; <code>Goods Transaction Detail</code></p>
+      <input type="file" id="file" accept=".xlsx,.xls,.xlsm" hidden />
+    </div>
+    <div id="status" class="status info hidden"></div>
   </div>
 
-  <!-- ================= TAB 1 ================= -->
-  <section id="tab1">
-
-    <div class="panel">
-      <h2><span class="dot"></span>1. Sumber Data — ASA19 (MSK)</h2>
-      <p class="sub">Unggah file <b>PurchaseReceipt.xlsx</b> (sheet <i>Detail</i> / <i>Header</i>). Sheet <b>Detail</b> akan dipakai otomatis.</p>
-      <label class="drop" id="t1-drop">
-        <div class="ic">📥</div>
-        <b>Klik atau tarik file MSK ke sini</b>
-        <span>.xlsx / .xls / .csv</span>
-        <input type="file" id="t1-file" accept=".xlsx,.xls,.csv">
-      </label>
-      <div class="msg" id="t1-msg"></div>
-      <div class="kv" id="t1-info"></div>
+  <!-- ===== PANEL HASIL EKSTRAK: NOMOR REFERENSI & LOKASI TUJUAN ===== -->
+  <div class="card hlPanel hidden" id="hlPanel">
+    <div class="hlBox">
+      <div class="lbl"><span class="dot"></span> Nomor Referensi — hasil ekstrak</div>
+      <div class="val" id="hlRefVal">—</div>
+      <div class="sub" id="hlRefSub"></div>
     </div>
+    <div class="hlBox">
+      <div class="lbl"><span class="dot"></span> Lokasi Tujuan — hasil ekstrak</div>
+      <div class="val" id="hlLokVal">—</div>
+      <div class="sub" id="hlLokSub"></div>
+    </div>
+  </div>
 
-    <div class="panel" id="t1-param" style="display:none">
-      <h2><span class="dot"></span>2. Parameter Output — ASA4 (TMR)</h2>
-      <p class="sub">Atur format INPUT DO. Nilai kosong akan memakai nilai dari file sumber.</p>
-
-      <div class="grid">
-        <div class="field">
-          <label>Kode Perusahaan</label>
-          <input type="text" id="s-kode" placeholder="SKM">
-        </div>
-        <div class="field">
-          <label>Site</label>
-          <input type="text" id="s-site" placeholder="KPG">
-        </div>
-        <div class="field">
-          <label>Lokasi Tujuan</label>
-          <input type="text" id="s-lokasi" placeholder="SVRMBKPG">
-        </div>
-        <div class="field">
-          <label>NIK Tujuan</label>
-          <input type="text" id="s-nik" value="0">
-        </div>
-        <div class="field">
-          <label>Pola Nomor Dokumen</label>
-          <input type="text" id="s-pola" value="TMR/{site}/SV/{yy}/{mm}/{seq}">
-          <span class="hint">Token: {site} {yy} {yyyy} {mm} {dd} {seq}</span>
-        </div>
-        <div class="field">
-          <label>Nomor Awal Urut</label>
-          <input type="number" id="s-seq" value="1" min="1">
-        </div>
-        <div class="field">
-          <label>Penomoran</label>
-          <select id="s-mode">
-            <option value="doc">1 nomor dokumen per dokumen sumber</option>
-            <option value="row">1 nomor dokumen per baris</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Nomor Referensi</label>
-          <input type="text" id="s-ref" placeholder="TKR/PST/SV/26/10/112">
-          <span class="hint">Kosongkan → pakai Nomor Referensi sumber</span>
-        </div>
-        <div class="field">
-          <label>Tipe Transaksi</label>
-          <input type="text" id="s-tipe" value="RECEIPT">
-        </div>
-        <div class="field">
-          <label>Status</label>
-          <input type="text" id="s-status" placeholder="(kosong)">
-        </div>
-        <div class="field">
-          <label>Dibuat / Diubah Oleh</label>
-          <input type="text" id="s-oleh" value="gregorius.b.sale@polytron.co.id">
-        </div>
-        <div class="field">
-          <label>Tanggal (Dibuat Pada)</label>
-          <input type="date" id="s-tgl">
-        </div>
-        <div class="field">
-          <label>Satuan Default</label>
-          <input type="text" id="s-satuan" value="EA">
-        </div>
-        <div class="field">
-          <label>Conversion Qty / Value</label>
-          <input type="text" id="s-conv" value="0">
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:14px">
-        <label class="chk"><input type="checkbox" id="s-permintaan"> Sertakan <b>Nomor Permintaan</b></label>
-        <label class="chk"><input type="checkbox" id="s-parent"> Sertakan <b>Site Parent</b></label>
+  <!-- COLUMN PICKER -->
+  <div class="card hidden" id="colCard">
+    <div class="colBar">
+      <span class="tit">Tampilkan Kolom:</span>
+      <span id="colChips"></span>
+      <div class="actions">
+        <button id="btnColKey">★ Hanya Kolom Penting</button>
+        <button id="btnColAll">Tampilkan Semua</button>
       </div>
     </div>
+  </div>
 
-    <div class="panel" id="t1-filter-panel" style="display:none">
-      <h2><span class="dot"></span>3. Filter Data</h2>
-      <p class="sub">Persempit baris MSK yang akan dikonversi.</p>
-      <div class="grid">
-        <div class="field">
-          <label>Status</label>
-          <select id="f-status"><option value="">— Semua —</option></select>
-        </div>
-        <div class="field">
-          <label>Tipe Transaksi</label>
-          <select id="f-tipe"><option value="">— Semua —</option></select>
-        </div>
-        <div class="field">
-          <label>Nomor Dokumen</label>
-          <select id="f-doc"><option value="">— Semua —</option></select>
-        </div>
-        <div class="field">
-          <label>Cari (Part / Deskripsi)</label>
-          <input type="text" id="f-cari" placeholder="ketik untuk mencari…">
-        </div>
-        <div class="field">
-          <label>Qty Minimum</label>
-          <input type="number" id="f-qty" value="0" step="any">
-        </div>
-        <div class="field">
-          <label>&nbsp;</label>
-          <button class="btn" id="f-reset">↺ Reset Filter</button>
-        </div>
-      </div>
+  <!-- FILTER -->
+  <div class="card hidden" id="filterCard">
+    <div class="filters">
+      <div class="f keyFilter"><label>★ Nomor Referensi</label><select id="f_ref"></select></div>
+      <div class="f keyFilter"><label>★ Lokasi Tujuan</label><select id="f_lok"></select></div>
+      <div class="f"><label>Nomor Dokumen</label><select id="f_doc"></select></div>
+      <div class="f"><label>Tipe Transaksi</label><select id="f_type"></select></div>
+      <div class="f"><label>Status</label><select id="f_status"></select></div>
+      <div class="f"><label>Kode Perusahaan</label><select id="f_company"></select></div>
+      <div class="f"><label>Site</label><select id="f_site"></select></div>
+      <div class="f"><label>Part / Deskripsi</label><input id="f_text" type="text" placeholder="cari part, deskripsi, lot…" /></div>
+      <div class="f"><label>Dibuat Pada (dari)</label><input id="f_date1" type="date" /></div>
+      <div class="f"><label>Dibuat Pada (sampai)</label><input id="f_date2" type="date" /></div>
+      <div class="f"><label>&nbsp;</label><button class="ghost" id="btnReset">Reset Filter</button></div>
+      <div class="f"><label>Baris kosong di atas header (export)</label><input id="blankRows" type="number" min="0" max="10" value="4" /></div>
     </div>
+  </div>
 
-    <div class="panel" id="t1-hasil" style="display:none">
-      <h2><span class="dot"></span>4. Hasil Konversi — INPUT DO (ASA4 / TMR)</h2>
-      <div class="stats" id="t1-stats"></div>
-
-      <div class="row" style="margin-bottom:12px">
-        <button class="btn primary" id="t1-gen">⚙️ Generate Ulang</button>
-        <button class="btn ok" id="t1-dl">⬇️ Download .xlsx</button>
-        <button class="btn" id="t1-csv">⬇️ Download .csv</button>
-        <button class="btn" id="t1-to-tab2">➡️ Kirim ke Tab 2</button>
-      </div>
-
-      <div style="font-weight:700;font-size:12.5px;margin:12px 0 6px;color:#334155">PREVIEW HASIL (TMR)</div>
-      <div id="t1-out"></div>
-
-      <div style="font-weight:700;font-size:12.5px;margin:16px 0 6px;color:#334155">PREVIEW SUMBER (MSK, terfilter)</div>
-      <div id="t1-src"></div>
+  <!-- TABLE -->
+  <div class="card tableCard hidden" id="tableCard">
+    <div class="tableInfo">
+      <span id="statRows">—</span>
+      <span id="statSheet" class="muted"></span>
     </div>
-
-  </section>
-
-  <!-- ================= TAB 2 ================= -->
-  <section id="tab2" class="hide">
-
-    <div class="panel">
-      <h2><span class="dot"></span>1. Sumber Data — ASA4 (TMR) &amp; ASA10 (RSV)</h2>
-      <p class="sub">Unggah file <b>TMR (INPUT DO)</b> dan file <b>RSV (ASA10)</b>, atau ambil langsung dari hasil Tab 1.</p>
-
-      <div class="two">
-        <div>
-          <div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#1e40af">📄 FILE TMR — ASA4 (INPUT DO)</div>
-          <label class="drop" id="t2-drop-tmr">
-            <div class="ic">📥</div>
-            <b>Klik / tarik file TMR</b>
-            <span>.xlsx / .xls / .csv</span>
-            <input type="file" id="t2-file-tmr" accept=".xlsx,.xls,.csv">
-          </label>
-          <div class="kv" id="t2-info-tmr"></div>
-        </div>
-        <div>
-          <div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#7c3aed">📄 FILE RSV — ASA10</div>
-          <label class="drop" id="t2-drop-rsv">
-            <div class="ic">📥</div>
-            <b>Klik / tarik file RSV</b>
-            <span>.xlsx / .xls / .csv</span>
-            <input type="file" id="t2-file-rsv" accept=".xlsx,.xls,.csv">
-          </label>
-          <div class="kv" id="t2-info-rsv"></div>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:14px">
-        <button class="btn" id="t2-use-tab1">↩️ Pakai hasil Tab 1 sebagai file TMR</button>
-        <button class="btn" id="t2-reset">↺ Reset</button>
-      </div>
-      <div class="msg" id="t2-msg"></div>
+    <div class="tablewrap" id="tablewrap">
+      <table class="xl" id="tbl">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty hidden" id="emptyState">Tidak ada baris yang cocok dengan filter.</div>
+      <div class="emptyCol hidden" id="emptyColState">Semua kolom disembunyikan — pilih minimal satu kolom di atas.</div>
     </div>
+  </div>
 
-    <div class="panel" id="t2-param" style="display:none">
-      <h2><span class="dot"></span>2. Parameter Penggabungan — DATA SMARTX</h2>
-      <div class="grid">
-        <div class="field">
-          <label>Mode Output</label>
-          <select id="t2-mode">
-            <option value="rekap">Rekap per kunci (TMR vs RSV)</option>
-            <option value="detail">Detail gabungan (baris per baris)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Kolom Kunci Gabung</label>
-          <select id="t2-key"></select>
-          <span class="hint">Biasanya: <b>Part</b></span>
-        </div>
-        <div class="field">
-          <label>Kolom Qty</label>
-          <select id="t2-qty"></select>
-        </div>
-        <div class="field">
-          <label>Kolom Deskripsi</label>
-          <select id="t2-desc"></select>
-        </div>
-        <div class="field">
-          <label>Kolom Satuan</label>
-          <select id="t2-satuan"></select>
-        </div>
-        <div class="field">
-          <label>Kolom Nomor Dokumen</label>
-          <select id="t2-doc"></select>
-        </div>
-      </div>
+</div>
+
+<!-- ================= MODAL MAPPING ================= -->
+<div class="modal hidden" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      Mapping Kolom Sumber → Kolom Output
+      <button id="modalClose">✕</button>
     </div>
-
-    <div class="panel" id="t2-hasil" style="display:none">
-      <h2><span class="dot"></span>3. Hasil — INPUT DATA SMARTX</h2>
-      <div class="stats" id="t2-stats"></div>
-      <div class="row" style="margin-bottom:12px">
-        <button class="btn primary" id="t2-gen">⚙️ Generate Ulang</button>
-        <button class="btn ok" id="t2-dl">⬇️ Download .xlsx</button>
-        <button class="btn" id="t2-csv">⬇️ Download .csv</button>
-      </div>
-      <div id="t2-out"></div>
+    <div class="modal-body" id="mapBody"></div>
+    <div class="modal-foot">
+      <span class="muted" id="mapInfo"></span>
+      <div class="spacer"></div>
+      <button class="ghost" id="btnAutoMap">Auto-detect ulang</button>
+      <button class="primary" id="btnApplyMap">Terapkan</button>
     </div>
-
-  </section>
-
+  </div>
 </div>
 
 <script>
 /* =========================================================
-   UTILITAS
+   1. KONFIGURASI KOLOM OUTPUT
    ========================================================= */
-const $  = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const KEY_FIELDS = ['nomorReferensi','lokasiTujuan'];   // kolom yang di-highlight & ditonjolkan
 
-const norm    = v => String(v == null ? '' : v).trim();
-const normKey = v => norm(v).toLowerCase();
-const esc = v => String(v == null ? '' : v)
-  .replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pad = (n, l = 2) => String(n).padStart(l, '0');
-
-function toNum(v) {
-  if (v === '' || v == null) return '';
-  const n = Number(String(v).replace(/,/g, ''));
-  return isNaN(n) ? v : n;
-}
-function num(v) { const n = Number(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
-
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function isoToDMY(iso) {
-  if (!iso) return '';
-  const p = iso.split('-');
-  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
-}
-function dmyToParts(dmy) {
-  const p = String(dmy).split(/[\/\-]/);
-  if (p.length === 3 && p[2].length === 4) return { d: p[0], m: p[1], y: p[2] };
-  return { d: '01', m: '01', y: String(new Date().getFullYear()) };
-}
-
-/* Ambil nilai pertama yang cocok dari sebuah record (case-insensitive) */
-function pick(obj, names) {
-  if (!obj) return '';
-  for (const n of names) {
-    const target = normKey(n);
-    for (const k in obj) {
-      if (normKey(k) === target) {
-        const v = obj[k];
-        if (v !== undefined && v !== null && norm(v) !== '') return norm(v);
-      }
-    }
-  }
-  return '';
-}
-
-function msg(sel, text, type = 'info') {
-  const el = $(sel);
-  el.className = 'msg show ' + type;
-  el.innerHTML = text;
-}
-function hideMsg(sel) { $(sel).className = 'msg'; }
-
-function setInfo(sel, html) { $(sel).innerHTML = html; }
-
-/* Baca file Excel */
-function readWB(file) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = e => {
-      try { resolve(XLSX.read(new Uint8Array(e.target.result), { type: 'array' })); }
-      catch (err) { reject(err); }
-    };
-    fr.onerror = reject;
-    fr.readAsArrayBuffer(file);
-  });
-}
-
-function wbToAOA(wb, sheetName) {
-  const ws = wb.Sheets[sheetName];
-  if (!ws) return [];
-  return XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '', blankrows: true });
-}
-
-const HEADER_HINTS = ['no', 'kode perusahaan', 'site', 'nomor dokumen', 'part', 'qty', 'deskripsi', 'status'];
-
-function detectHeader(aoa) {
-  let best = -1, bestScore = 0;
-  const lim = Math.min(aoa.length, 40);
-  for (let i = 0; i < lim; i++) {
-    const cells = (aoa[i] || []).map(normKey).filter(Boolean);
-    if (!cells.length) continue;
-    let score = 0;
-    for (const h of HEADER_HINTS) if (cells.includes(h)) score++;
-    if (cells.includes('part')) score += 2;
-    if (cells.includes('nomor dokumen')) score += 1;
-    if (score > bestScore) { bestScore = score; best = i; }
-  }
-  return bestScore >= 3 ? best : -1;
-}
-
-function aoaToRecords(aoa, hIdx) {
-  const headers = (aoa[hIdx] || []).map(h => norm(h)).filter((h, i, a) => h !== '' || i < 0);
-  const clean = [];
-  (aoa[hIdx] || []).forEach((h, i) => { clean[i] = norm(h) || `Kolom${i + 1}`; });
-
-  const records = [];
-  for (let i = hIdx + 1; i < aoa.length; i++) {
-    const row = aoa[i] || [];
-    if (!row.length || row.every(c => norm(c) === '')) continue;
-    const obj = {};
-    clean.forEach((h, ci) => { obj[h] = row[ci] !== undefined ? row[ci] : ''; });
-    records.push(obj);
-  }
-  return { headers: clean, records };
-}
-
-/* Pilih sheet terbaik dari workbook */
-function pickSheet(wb, preferNames = []) {
-  for (const p of preferNames) {
-    const hit = wb.SheetNames.find(n => normKey(n) === normKey(p));
-    if (hit) return hit;
-  }
-  for (const p of preferNames) {
-    const hit = wb.SheetNames.find(n => normKey(n).includes(normKey(p)));
-    if (hit) return hit;
-  }
-  let best = null, bestScore = -1;
-  for (const n of wb.SheetNames) {
-    const aoa = wbToAOA(wb, n);
-    const h = detectHeader(aoa);
-    if (h >= 0) {
-      const sc = aoa.length - h;
-      if (sc > bestScore) { bestScore = sc; best = n; }
-    }
-  }
-  return best || wb.SheetNames[0];
-}
-
-/* Render tabel */
-function renderTable(hostSel, headers, rows, limit = 300) {
-  const host = $(hostSel);
-  if (!rows.length) {
-    host.innerHTML = '<div class="empty">Tidak ada data untuk ditampilkan.</div>';
-    return;
-  }
-  const shown = rows.slice(0, limit);
-  let html = '<div class="tablewrap"><table><thead><tr>';
-  headers.forEach(h => html += `<th>${esc(h)}</th>`);
-  html += '</tr></thead><tbody>';
-  for (const r of shown) {
-    html += '<tr>';
-    headers.forEach(h => html += `<td>${esc(r[h])}</td>`);
-    html += '</tr>';
-  }
-  html += '</tbody></table></div>';
-  if (rows.length > limit) {
-    html += `<div class="note">Menampilkan <b>${limit}</b> dari <b>${rows.length}</b> baris. Unduh file untuk data lengkap.</div>`;
-  }
-  host.innerHTML = html;
-}
-
-/* Drag & drop helper */
-function wireDrop(dropSel, inputSel, onFile) {
-  const drop = $(dropSel), input = $(inputSel);
-  input.addEventListener('change', e => { if (e.target.files[0]) onFile(e.target.files[0]); });
-  ['dragenter', 'dragover'].forEach(ev =>
-    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave', 'drop'].forEach(ev =>
-    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', e => {
-    const f = e.dataTransfer.files[0];
-    if (f) onFile(f);
-  });
-}
-
-/* Format angka untuk output */
-function fmtQty(v) {
-  const n = Number(String(v).replace(/,/g, ''));
-  if (v === '' || v == null || isNaN(n)) return v === '' ? '' : v;
-  return n;
-}
-
-/* Download helper */
-function downloadAOA(aoa, sheetName, fileName, forceRef) {
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  if (forceRef) ws['!ref'] = forceRef;
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Sheet1');
-  XLSX.writeFile(wb, fileName);
-}
-function downloadCSV(aoa, fileName) {
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const csv = XLSX.utils.sheet_to_csv(ws, { FS: ';' });
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-/* =========================================================
-   TABS
-   ========================================================= */
-$$('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    $$('.tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const target = btn.dataset.tab;
-    $('#tab1').classList.toggle('hide', target !== 'tab1');
-    $('#tab2').classList.toggle('hide', target !== 'tab2');
-  });
-});
-
-/* =========================================================
-   TAB 1 — CONVERTER ASA4 (TMR) + ASA19 (MSK)
-   ========================================================= */
-const TMR_COLUMNS = [
-  'No','Kode Perusahaan','Site','Nomor Dokumen','Nomor Referensi','Lokasi Tujuan',
-  'NIK Tujuan','Tipe Transaksi','Status','Baris','Part','Deskripsi','Lot','Attribute',
-  'Qty','Satuan','Conversion Qty','Conversion UM','Conversion Value','Nomor Permintaan',
-  'Price Per Unit','Total Value','Mata Uang','Site Parent','Dibuat Oleh','Dibuat Pada',
-  'Dikonfirmasi Oleh','Dikonfirmasi Pada','Diubah Oleh','Diubah Pada'
+const FIELDS = [
+  {key:'kodePerusahaan',   label:'Kode Perusahaan',   src:'H', al:['kodeperusahaan','companycode','kodecompany','kodept','kodeentitas','entitycode']},
+  {key:'site',             label:'Site',              src:'H', al:['site','kodesite','sitecode','siteid']},
+  {key:'nomorDokumen',     label:'Nomor Dokumen',     src:'H', al:['nomordokumen','nodokumen','documentnumber','documentno','docnumber','docno','nomortransaksi','transactionno','nobukti']},
+  {key:'nomorReferensi',   label:'Nomor Referensi',   src:'H', al:['nomorreferensi','noreferensi','referencenumber','referenceno','refno','nomorref','noref','nomorrefrensi','refrensi','nomorreferance','reference']},
+  {key:'lokasiTujuan',     label:'Lokasi Tujuan',     src:'H', al:['lokasitujuan','locationdestination','destination','tolocation','lokasidestination','kodetujuan','tujuan','lokasituju','destlocation','tujuanlokasi','locationtujuan']},
+  {key:'nikTujuan',        label:'NIK Tujuan',        src:'H', al:['niktujuan','nik','nikpenerima','tujuannik','nikdest']},
+  {key:'tipeTransaksi',    label:'Tipe Transaksi',    src:'H', al:['tipetransaksi','transactiontype','jenistransaksi','trxtype','tipetrx','transactioncode']},
+  {key:'status',           label:'Status',            src:'H', al:['status','statusdokumen','docstatus','statusdoc','statusdoc']},
+  {key:'baris',            label:'Baris',             src:'D', al:['baris','line','lineno','nomorbaris','linenumber','itemno','lineitem','noitem','linenum']},
+  {key:'part',             label:'Part',              src:'D', al:['part','partnumber','kodepart','partno','itemcode','kodeitem','kodebarang','materialcode','material']},
+  {key:'deskripsi',        label:'Deskripsi',         src:'D', al:['deskripsi','description','namapart','partdescription','itemdescription','uraian','namabarang','itemname']},
+  {key:'lot',              label:'Lot',               src:'D', al:['lot','nomorlot','lotno','batchno','batch']},
+  {key:'attribute',        label:'Attribute',         src:'D', al:['attribute','atribut','attr']},
+  {key:'qty',              label:'Qty',               src:'D', al:['qty','quantity','jumlah','kuantitas','qtybase']},
+  {key:'satuan',           label:'Satuan',            src:'D', al:['satuan','uom','unit','unitofmeasure','um','satuanum','uomcode']},
+  {key:'conversionQty',    label:'Conversion Qty',    src:'D', al:['conversionqty','qtykonversi','convqty','konversiqty','qtyconvert','conversionquantity']},
+  {key:'conversionUM',     label:'Conversion UM',     src:'D', al:['conversionum','umkonversi','convum','konversium','conversionuom']},
+  {key:'conversionValue',  label:'Conversion Value',  src:'D', al:['conversionvalue','nilaikonversi','convvalue','konversivalue']},
+  {key:'nomorPermintaan',  label:'Nomor Permintaan',  src:'H', al:['nomorpermintaan','nopermintaan','requestnumber','requestno','nomorrequest','nopr','prnumber','nomorpr','ponumber','nomorpo']},
+  {key:'pricePerUnit',     label:'Price Per Unit',    src:'D', al:['priceperunit','hargapersatuan','unitprice','harga','price','hargasatuan']},
+  {key:'totalValue',       label:'Total Value',       src:'D', al:['totalvalue','nilaitotal','amount','totalamount','totalharga','jumlahharga','total']},
+  {key:'mataUang',         label:'Mata Uang',         src:'H', al:['matauang','currency','curr','valuta','currencycode']},
+  {key:'siteParent',       label:'Site Parent',       src:'H', al:['siteparent','parentsite','siteinduk','parent']},
+  {key:'dibuatOleh',       label:'Dibuat Oleh',       src:'H', al:['dibuatoleh','createdby','createduser','userpembuat','createby','createdname']},
+  {key:'dibuatPada',       label:'Dibuat Pada',       src:'H', al:['dibuatpada','createdat','createddate','tanggaldibuat','createdon','tgldibuat','created']},
+  {key:'dikonfirmasiOleh', label:'Dikonfirmasi Oleh', src:'H', al:['dikonfirmasioleh','confirmedby','confirmeduser','confirmby','confirmedname']},
+  {key:'dikonfirmasiPada', label:'Dikonfirmasi Pada', src:'H', al:['dikonfirmasipada','confirmedat','confirmeddate','tanggaldikonfirmasi','confirmedon']},
+  {key:'diubahOleh',       label:'Diubah Oleh',       src:'H', al:['diubaholeh','modifiedby','updatedby','changedby','userubah','modifyby','modifiedname']},
+  {key:'diubahPada',       label:'Diubah Pada',       src:'H', al:['diubahpada','modifiedat','updatedat','changedat','tanggaldiubah','modifiedon']}
 ];
 
-const T1 = { headers: [], records: [], filtered: [], output: [], fileName: '' };
+const WIDTHS = {
+  kodePerusahaan:110, site:80, nomorDokumen:180, nomorReferensi:200, lokasiTujuan:140,
+  nikTujuan:90, tipeTransaksi:110, status:95, baris:60, part:145, deskripsi:300,
+  lot:70, attribute:95, qty:65, satuan:70, conversionQty:105, conversionUM:105,
+  conversionValue:115, nomorPermintaan:150, pricePerUnit:105, totalValue:115,
+  mataUang:85, siteParent:110, dibuatOleh:190, dibuatPada:105,
+  dikonfirmasiOleh:190, dikonfirmasiPada:115, diubahOleh:190, diubahPada:105
+};
 
-function normalizeMsk(rec) {
-  return {
-    no:             pick(rec, ['No']),
-    kodePerusahaan: pick(rec, ['Kode Perusahaan']),
-    site:           pick(rec, ['Site']),
-    nomorDokumen:   pick(rec, ['Nomor Dokumen']),
-    nomorReferensi: pick(rec, ['Nomor Referensi']),
-    lokasiTujuan:   pick(rec, ['Lokasi Tujuan']),
-    nikTujuan:      pick(rec, ['Nik Tujuan', 'NIK Tujuan']),
-    tipeTransaksi:  pick(rec, ['Tipe Transaksi']),
-    status:         pick(rec, ['Status']),
-    baris:          pick(rec, ['Baris']),
-    part:           pick(rec, ['Part']),
-    deskripsi:      pick(rec, ['Deskripsi']),
-    lot:            pick(rec, ['Lot']),
-    attribute:      pick(rec, ['Attribute']),
-    qty:            pick(rec, ['Qty']),
-    satuan:         pick(rec, ['Satuan']),
-    convQty:        pick(rec, ['Conversion Qty']),
-    convUM:         pick(rec, ['Conversion UM']),
-    convValue:      pick(rec, ['Conversion Value']),
-    nomorPermintaan:pick(rec, ['Nomor Permintaan']),
-    pricePerUnit:   pick(rec, ['Price Per Unit']),
-    totalValue:     pick(rec, ['Total Value']),
-    mataUang:       pick(rec, ['Mata Uang']),
-    siteParent:     pick(rec, ['Site Parent']),
-    dibuatOleh:     pick(rec, ['Dibuat Oleh']),
-    dibuatPada:     pick(rec, ['Dibuat Pada'])
+const DETAIL_NAMES = ['Goods Transaction Detail','Goods Transcation Detail','GoodsTransactionDetail','Detail Goods Transaction'];
+const HEAD_NAMES   = ['Goods Transaction','Goods Transcation','GoodsTransaction','Goods Trx'];
+
+/* =========================================================
+   2. STATE
+   ========================================================= */
+let RAW = { h:{name:null,headers:[],rows:[]}, d:{name:null,headers:[],rows:[]} };
+let MAPPING = {};
+let ROWS = [];
+let FILTERED = [];
+let SOURCE_FILENAME = '';
+let VISIBLE = new Set(FIELDS.map(f => f.key));   // kolom yang ditampilkan
+
+/* =========================================================
+   3. UTIL
+   ========================================================= */
+const $  = s => document.querySelector(s);
+const norm = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function toDate(v){
+  if(v == null || v === '') return null;
+  if(v instanceof Date) return isNaN(v) ? null : v;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+function parseInputDate(s){
+  if(!s) return null;
+  const p = s.split('-').map(Number);
+  return new Date(p[0], p[1]-1, p[2]);
+}
+function setStatus(msg, type){
+  const el = $('#status');
+  el.className = 'status ' + (type || 'info');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function esc(s){ return String(s == null ? '' : s); }
+
+/* =========================================================
+   4. BACA FILE EXCEL
+   ========================================================= */
+$('#drop').addEventListener('click', () => $('#file').click());
+$('#file').addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+['dragenter','dragover'].forEach(ev =>
+  $('#drop').addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.add('over'); }));
+['dragleave','drop'].forEach(ev =>
+  $('#drop').addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.remove('over'); }));
+$('#drop').addEventListener('drop', e => {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+
+function handleFile(file){
+  SOURCE_FILENAME = file.name;
+  setStatus('Membaca file: ' + file.name + ' …', 'info');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try{
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {
+        type:'array', cellDates:false, cellNF:false, cellText:false
+      });
+      loadWorkbook(wb, file.name);
+    }catch(err){
+      console.error(err);
+      setStatus('Gagal membaca file: ' + err.message, 'error');
+    }
   };
+  reader.onerror = () => setStatus('Gagal membaca file.', 'error');
+  reader.readAsArrayBuffer(file);
 }
 
-async function t1Load(file) {
-  try {
-    msg('#t1-msg', '⏳ Membaca file…', 'info');
-    T1.fileName = file.name;
-    const wb = await readWB(file);
+function findSheet(wb, names, exclude){
+  const ex = (exclude || []).map(norm);
+  for(const n of names){
+    const f = wb.SheetNames.find(k => norm(k) === norm(n) && !ex.some(e => norm(k).includes(e)));
+    if(f) return f;
+  }
+  for(const n of names){
+    const f = wb.SheetNames.find(k => norm(k).includes(norm(n)) && !ex.some(e => norm(k).includes(e)));
+    if(f) return f;
+  }
+  return null;
+}
 
-    const sheet = pickSheet(wb, ['Detail', 'Header']);
-    const aoa = wbToAOA(wb, sheet);
-    const hIdx = detectHeader(aoa);
+function parseSheet(ws){
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:'', blankrows:false});
+  if(!aoa.length) return {headers:[], rows:[]};
 
-    if (hIdx < 0) {
-      msg('#t1-msg', '❌ Header tidak terdeteksi. Pastikan file berisi kolom <b>No</b>, <b>Kode Perusahaan</b>, <b>Part</b>, <b>Qty</b>.', 'err');
-      return;
+  const allAliases = new Set();
+  FIELDS.forEach(f => f.al.forEach(a => allAliases.add(a)));
+
+  let hIdx = -1, best = 0;
+  const scan = Math.min(aoa.length, 25);
+  for(let i = 0; i < scan; i++){
+    const cells = (aoa[i] || []).filter(c => String(c).trim() !== '');
+    if(cells.length < 2) continue;
+    let score = 0;
+    cells.forEach(c => { if(allAliases.has(norm(c))) score++; });
+    if(score > best){ best = score; hIdx = i; }
+  }
+  if(hIdx === -1){
+    hIdx = aoa.findIndex(r => (r || []).filter(c => String(c).trim() !== '').length >= 2);
+  }
+  if(hIdx === -1) return {headers:[], rows:[]};
+
+  const headers = (aoa[hIdx] || []).map(h => String(h).trim());
+  const rows = [];
+  for(let i = hIdx + 1; i < aoa.length; i++){
+    const r = aoa[i] || [];
+    if(!r.some(c => String(c).trim() !== '')) continue;
+    const o = {};
+    headers.forEach((h, c) => { if(h) o[h] = (r[c] === undefined ? '' : r[c]); });
+    rows.push(o);
+  }
+  return {headers, rows};
+}
+
+function loadWorkbook(wb, fname){
+  const sheets = wb.SheetNames;
+  let dName = findSheet(wb, DETAIL_NAMES, []);
+  let hName = findSheet(wb, HEAD_NAMES, ['detail']);
+  if(hName === dName) hName = null;
+
+  if(!hName && !dName){
+    setStatus('Sheet "Goods Transaction" / "Goods Transaction Detail" tidak ditemukan. Sheet tersedia: ' + sheets.join(', '), 'error');
+    return;
+  }
+  if(!hName) hName = sheets.find(n => n !== dName) || null;
+  if(!dName) dName = sheets.find(n => n !== hName) || null;
+
+  RAW.h = hName ? Object.assign({name:hName}, parseSheet(wb.Sheets[hName])) : {name:null, headers:[], rows:[]};
+  RAW.d = dName ? Object.assign({name:dName}, parseSheet(wb.Sheets[dName])) : {name:null, headers:[], rows:[]};
+
+  if(!RAW.h.rows.length && !RAW.d.rows.length){
+    setStatus('File terbaca, tetapi tidak ada baris data yang ditemukan.', 'error');
+    return;
+  }
+
+  autoMap();
+  buildRows();
+  populateFilters();
+  buildColumnChips();
+  applyFilters();
+
+  $('#filterCard').classList.remove('hidden');
+  $('#colCard').classList.remove('hidden');
+  $('#tableCard').classList.remove('hidden');
+  $('#hlPanel').classList.remove('hidden');
+  $('#btnMapping').disabled = false;
+  $('#btnExport').disabled = false;
+
+  setStatus(
+    '✔ Berhasil dimuat — Header: "' + (RAW.h.name || '-') + '" (' + RAW.h.rows.length + ' baris) · ' +
+    'Detail: "' + (RAW.d.name || '-') + '" (' + RAW.d.rows.length + ' baris) · ' +
+    'Total output: ' + ROWS.length + ' baris',
+    'ok'
+  );
+}
+
+/* =========================================================
+   5. AUTO MAPPING
+   ========================================================= */
+function pickCol(headers, aliases, used){
+  for(const a of aliases){
+    const h = headers.find(x => norm(x) === a && !used.has(x));
+    if(h) return h;
+  }
+  return null;
+}
+
+function autoMap(){
+  MAPPING = {};
+  const usedH = new Set(), usedD = new Set();
+
+  // pass 1 — sheet sesuai preferensi
+  FIELDS.forEach(f => {
+    const used  = f.src === 'H' ? usedH : usedD;
+    const sheet = f.src === 'H' ? RAW.h : RAW.d;
+    const col   = pickCol(sheet.headers, f.al, used);
+    MAPPING[f.key] = {sheet: f.src, col: col || null};
+    if(col) used.add(col);
+  });
+
+  // pass 2 — sheet alternatif
+  FIELDS.forEach(f => {
+    if(MAPPING[f.key].col) return;
+    const other = f.src === 'H' ? 'D' : 'H';
+    const used  = other === 'H' ? usedH : usedD;
+    const sheet = other === 'H' ? RAW.h : RAW.d;
+    const col   = pickCol(sheet.headers, f.al, used);
+    if(col){ MAPPING[f.key] = {sheet: other, col}; used.add(col); }
+  });
+
+  // pass 3 — pencocokan longgar khusus kolom penting (Nomor Referensi & Lokasi Tujuan)
+  KEY_FIELDS.forEach(k => {
+    if(MAPPING[k] && MAPPING[k].col) return;
+    const f = FIELDS.find(x => x.key === k);
+    for(const sheetKey of ['H','D']){
+      const sheet = sheetKey === 'H' ? RAW.h : RAW.d;
+      const used  = sheetKey === 'H' ? usedH : usedD;
+      const found = sheet.headers.find(h => {
+        const n = norm(h);
+        return f.al.some(a => n.includes(a) || a.includes(n)) && !used.has(h);
+      });
+      if(found){
+        MAPPING[k] = {sheet: sheetKey, col: found};
+        used.add(found);
+        return;
+      }
     }
+  });
+}
 
-    const { headers, records } = aoaToRecords(aoa, hIdx);
-    T1.headers = headers;
-    T1.records = records.map(normalizeMsk).filter(r => r.part !== '' || r.nomorDokumen !== '');
+/* =========================================================
+   6. GABUNGKAN HEADER + DETAIL
+   ========================================================= */
+function buildRows(){
+  const nd = FIELDS.find(f => f.key === 'nomorDokumen');
+  const hDocCol = RAW.h.headers.find(x => nd.al.includes(norm(x))) || null;
+  const dDocCol = RAW.d.headers.find(x => nd.al.includes(norm(x))) || null;
 
-    if (!T1.records.length) {
-      msg('#t1-msg', '❌ Tidak ada baris data yang ditemukan.', 'err');
-      return;
+  const hMap = new Map();
+  if(hDocCol){
+    RAW.h.rows.forEach(r => {
+      const k = String(r[hDocCol] == null ? '' : r[hDocCol]).trim();
+      if(k && !hMap.has(k)) hMap.set(k, r);
+    });
+  }
+
+  const pairs = [];
+  if(RAW.d.rows.length){
+    let useKey = false;
+    if(dDocCol && hMap.size){
+      const matched = RAW.d.rows.filter(d =>
+        hMap.has(String(d[dDocCol] == null ? '' : d[dDocCol]).trim())).length;
+      useKey = matched > 0;
     }
+    RAW.d.rows.forEach((d, i) => {
+      let h = null;
+      if(useKey){
+        const k = String(d[dDocCol] == null ? '' : d[dDocCol]).trim();
+        h = hMap.get(k) || null;
+      }
+      if(!h) h = RAW.h.rows[i] || (RAW.h.rows.length === 1 ? RAW.h.rows[0] : null);
+      pairs.push([h || {}, d]);
+    });
+  }else{
+    RAW.h.rows.forEach(h => pairs.push([h, {}]));
+  }
 
-    /* Isi otomatis parameter dari data sumber */
-    const first = T1.records[0];
-    if (!$('#s-kode').value)   $('#s-kode').value   = first.kodePerusahaan;
-    if (!$('#s-site').value)   $('#s-site').value   = first.site;
-    if (!$('#s-lokasi').value) $('#s-lokasi').value = first.lokasiTujuan;
-    if (!$('#s-tgl').value)    $('#s-tgl').value    = todayISO();
-    if (!$('#s-ref').value) {
-      const { y, m } = dmyToParts(isoToDMY($('#s-tgl').value));
-      $('#s-ref').value = `TKR/PST/SV/${y.slice(2)}/${m}/001`;
-    }
-    if (!$('#s-oleh').value && first.dibuatOleh) $('#s-oleh').value = first.dibuatOleh;
+  ROWS = pairs.map(([h, d], idx) => {
+    const rec = {};
+    FIELDS.forEach(f => {
+      const m = MAPPING[f.key];
+      let v = '';
+      if(m && m.col){
+        const row = m.sheet === 'H' ? h : d;
+        if(row && row[m.col] !== undefined && row[m.col] !== null) v = row[m.col];
+      }
+      rec[f.key] = v;
+    });
+    if(String(rec.baris).trim() === '') rec.baris = idx + 1;
+    return rec;
+  });
+}
 
-    /* Dropdown filter */
-    fillSelect('#f-status', unique(T1.records.map(r => r.status)));
-    fillSelect('#f-tipe',   unique(T1.records.map(r => r.tipeTransaksi)));
-    fillSelect('#f-doc',    unique(T1.records.map(r => r.nomorDokumen)));
+/* =========================================================
+   7. PANEL HASIL EKSTRAK (Nomor Referensi & Lokasi Tujuan)
+   ========================================================= */
+function renderHighlightPanel(){
+  const refs = [...new Set(FILTERED.map(r => String(r.nomorReferensi || '').trim()).filter(Boolean))];
+  const loks = [...new Set(FILTERED.map(r => String(r.lokasiTujuan  || '').trim()).filter(Boolean))];
 
-    $('#t1-drop').classList.add('loaded');
-    $('#t1-drop').querySelector('b').textContent = '✔ ' + file.name;
-    msg('#t1-msg', `✅ Berhasil membaca <b>${file.name}</b> — sheet <b>${esc(sheet)}</b>, <b>${T1.records.length}</b> baris data.`, 'ok');
-    setInfo('#t1-info', `Header baris ke-<b>${hIdx + 1}</b> • Kolom: <b>${headers.length}</b>`);
+  const refEl = $('#hlRefVal'), refSub = $('#hlRefSub');
+  const lokEl = $('#hlLokVal'), lokSub = $('#hlLokSub');
 
-    $('#t1-param').style.display = '';
-    $('#t1-filter-panel').style.display = '';
-    $('#t1-hasil').style.display = '';
+  if(refs.length === 0){
+    refEl.textContent = '— tidak ada nilai —';
+    refEl.classList.add('empty');
+    refSub.innerHTML = 'Kolom <b>Nomor Referensi</b> tidak terpetakan atau kosong pada baris terfilter.';
+  }else if(refs.length === 1){
+    refEl.textContent = refs[0];
+    refEl.classList.remove('empty');
+    refSub.innerHTML = 'Nilai tunggal · diambil dari <b>' + FILTERED.length + '</b> baris terfilter';
+  }else{
+    refEl.textContent = refs.slice(0, 3).join('  •  ') + (refs.length > 3 ? '  …' : '');
+    refEl.classList.remove('empty');
+    refSub.innerHTML = '<b>' + refs.length + '</b> nilai unik dari ' + FILTERED.length + ' baris terfilter';
+  }
 
-    t1Render();
-  } catch (err) {
-    console.error(err);
-    msg('#t1-msg', '❌ Gagal membaca file: ' + esc(err.message), 'err');
+  if(loks.length === 0){
+    lokEl.textContent = '— tidak ada nilai —';
+    lokEl.classList.add('empty');
+    lokSub.innerHTML = 'Kolom <b>Lokasi Tujuan</b> tidak terpetakan atau kosong pada baris terfilter.';
+  }else if(loks.length === 1){
+    lokEl.textContent = loks[0];
+    lokEl.classList.remove('empty');
+    lokSub.innerHTML = 'Nilai tunggal · diambil dari <b>' + FILTERED.length + '</b> baris terfilter';
+  }else{
+    lokEl.textContent = loks.slice(0, 3).join('  •  ') + (loks.length > 3 ? '  …' : '');
+    lokEl.classList.remove('empty');
+    lokSub.innerHTML = '<b>' + loks.length + '</b> nilai unik dari ' + FILTERED.length + ' baris terfilter';
   }
 }
 
-function unique(arr) {
-  return Array.from(new Set(arr.map(v => norm(v)).filter(v => v !== ''))).sort();
-}
-function fillSelect(sel, values, keepFirst = true) {
-  const el = $(sel);
+/* =========================================================
+   8. FILTER
+   ========================================================= */
+function fillSelect(id, values, allLabel){
+  const el = document.getElementById(id);
   const cur = el.value;
-  el.innerHTML = '<option value="">— Semua —</option>' +
-    values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
-  if (values.includes(cur)) el.value = cur;
+  el.innerHTML = '';
+  const o = document.createElement('option');
+  o.value = ''; o.textContent = allLabel;
+  el.appendChild(o);
+  values.forEach(v => {
+    const op = document.createElement('option');
+    op.value = v; op.textContent = v;
+    el.appendChild(op);
+  });
+  if(values.includes(cur)) el.value = cur;
+}
+function uniq(key){
+  return [...new Set(ROWS.map(r => String(r[key] == null ? '' : r[key]).trim()).filter(Boolean))].sort();
+}
+function populateFilters(){
+  fillSelect('f_ref',     uniq('nomorReferensi'), 'Semua Referensi');
+  fillSelect('f_lok',     uniq('lokasiTujuan'),   'Semua Lokasi Tujuan');
+  fillSelect('f_doc',     uniq('nomorDokumen'),   'Semua Dokumen');
+  fillSelect('f_type',    uniq('tipeTransaksi'),  'Semua Tipe');
+  fillSelect('f_status',  uniq('status'),         'Semua Status');
+  fillSelect('f_company', uniq('kodePerusahaan'), 'Semua Perusahaan');
+  fillSelect('f_site',    uniq('site'),           'Semua Site');
 }
 
-/* --- Filter --- */
-function t1ApplyFilter() {
-  const st  = $('#f-status').value;
-  const tp  = $('#f-tipe').value;
-  const doc = $('#f-doc').value;
-  const q   = normKey($('#f-cari').value);
-  const qmin = num($('#f-qty').value);
+function applyFilters(){
+  const ref  = $('#f_ref').value;
+  const lok  = $('#f_lok').value;
+  const doc  = $('#f_doc').value;
+  const type = $('#f_type').value;
+  const st   = $('#f_status').value;
+  const comp = $('#f_company').value;
+  const site = $('#f_site').value;
+  const text = $('#f_text').value.trim().toLowerCase();
+  const d1   = parseInputDate($('#f_date1').value);
+  const d2   = parseInputDate($('#f_date2').value);
+  if(d2) d2.setHours(23, 59, 59, 999);
 
-  T1.filtered = T1.records.filter(r => {
-    if (st  && normKey(r.status) !== normKey(st)) return false;
-    if (tp  && normKey(r.tipeTransaksi) !== normKey(tp)) return false;
-    if (doc && normKey(r.nomorDokumen) !== normKey(doc)) return false;
-    if (qmin > 0 && num(r.qty) < qmin) return false;
-    if (q) {
-      const hay = (normKey(r.part) + ' ' + normKey(r.deskripsi) + ' ' + normKey(r.nomorDokumen)).toLowerCase();
-      if (!hay.includes(q)) return false;
+  FILTERED = ROWS.filter(r => {
+    if(ref  && String(r.nomorReferensi)  !== ref)  return false;
+    if(lok  && String(r.lokasiTujuan)    !== lok)  return false;
+    if(doc  && String(r.nomorDokumen)    !== doc)  return false;
+    if(type && String(r.tipeTransaksi)   !== type) return false;
+    if(st   && String(r.status)          !== st)   return false;
+    if(comp && String(r.kodePerusahaan)  !== comp) return false;
+    if(site && String(r.site)            !== site) return false;
+    if(text){
+      const hay = [r.part, r.deskripsi, r.nomorDokumen, r.nomorReferensi, r.lokasiTujuan,
+                   r.lot, r.attribute, r.nomorPermintaan, r.dibuatOleh]
+                   .join(' ').toLowerCase();
+      if(!hay.includes(text)) return false;
+    }
+    if(d1 || d2){
+      const dt = toDate(r.dibuatPada);
+      if(!dt) return false;
+      if(d1 && dt < d1) return false;
+      if(d2 && dt > d2) return false;
     }
     return true;
   });
+
+  renderTable();
+  updateStats();
+  renderHighlightPanel();
 }
 
-/* --- Generate dokumen number --- */
-function buildDocNo(pattern, ctx) {
-  return pattern
-    .replace(/\{site\}/gi,  ctx.site)
-    .replace(/\{yyyy\}/gi,  ctx.yyyy)
-    .replace(/\{yy\}/gi,    ctx.yy)
-    .replace(/\{mm\}/gi,    ctx.mm)
-    .replace(/\{dd\}/gi,    ctx.dd)
-    .replace(/\{seq4\}/gi,  pad(ctx.seq, 4))
-    .replace(/\{seq\}/gi,   pad(ctx.seq, 3));
-}
-
-function t1Generate() {
-  t1ApplyFilter();
-
-  const dmy = isoToDMY($('#s-tgl').value || todayISO());
-  const parts = dmyToParts(dmy);
-  const pola = $('#s-pola').value || 'TMR/{site}/SV/{yy}/{mm}/{seq}';
-  const startSeq = Math.max(1, parseInt($('#s-seq').value, 10) || 1);
-  const mode = $('#s-mode').value;
-  const kode = $('#s-kode').value;
-  const site = $('#s-site').value;
-  const lokasi = $('#s-lokasi').value;
-  const nik = $('#s-nik').value;
-  const tipe = $('#s-tipe').value;
-  const status = $('#s-status').value;
-  const oleh = $('#s-oleh').value;
-  const satuanDef = $('#s-satuan').value || 'EA';
-  const convVal = $('#s-conv').value || '0';
-  const refOverride = $('#s-ref').value;
-  const incPermintaan = $('#s-permintaan').checked;
-  const incParent = $('#s-parent').checked;
-
-  let seq = startSeq;
-  const docMap = new Map();   // key dokumen sumber → nomor dokumen baru
-  const barisMap = new Map(); // nomor dokumen baru → counter baris
-  const out = [];
-
-  T1.filtered.forEach(r => {
-    let docNo;
-
-    if (mode === 'doc') {
-      const key = r.nomorDokumen || ('__row' + out.length);
-      if (!docMap.has(key)) {
-        docNo = buildDocNo(pola, {
-          site: site || r.site, yy: parts.y.slice(2), yyyy: parts.y,
-          mm: parts.m, dd: parts.d, seq: seq++
-        });
-        docMap.set(key, docNo);
-      } else {
-        docNo = docMap.get(key);
-      }
-    } else {
-      docNo = buildDocNo(pola, {
-        site: site || r.site, yy: parts.y.slice(2), yyyy: parts.y,
-        mm: parts.m, dd: parts.d, seq: seq++
-      });
-    }
-
-    const baris = (barisMap.get(docNo) || 0) + 1;
-    barisMap.set(docNo, baris);
-
-    const row = {
-      'No': out.length + 1,
-      'Kode Perusahaan': kode || r.kodePerusahaan,
-      'Site': site || r.site,
-      'Nomor Dokumen': docNo,
-      'Nomor Referensi': refOverride || r.nomorReferensi,
-      'Lokasi Tujuan': lokasi || r.lokasiTujuan,
-      'NIK Tujuan': nik,
-      'Tipe Transaksi': tipe,
-      'Status': status,
-      'Baris': baris,
-      'Part': r.part,
-      'Deskripsi': r.deskripsi,
-      'Lot': r.lot,
-      'Attribute': r.attribute,
-      'Qty': fmtQty(r.qty),
-      'Satuan': r.satuan || satuanDef,
-      'Conversion Qty': convVal,
-      'Conversion UM': '',
-      'Conversion Value': convVal,
-      'Nomor Permintaan': incPermintaan ? r.nomorPermintaan : '',
-      'Price Per Unit': '',
-      'Total Value': '',
-      'Mata Uang': '',
-      'Site Parent': incParent ? r.siteParent : '',
-      'Dibuat Oleh': oleh,
-      'Dibuat Pada': dmy,
-      'Dikonfirmasi Oleh': oleh,
-      'Dikonfirmasi Pada': dmy,
-      'Diubah Oleh': oleh,
-      'Diubah Pada': dmy
-    };
-    out.push(row);
+/* =========================================================
+   9. COLUMN CHIPS
+   ========================================================= */
+function buildColumnChips(){
+  const box = $('#colChips');
+  box.innerHTML = '';
+  FIELDS.forEach(f => {
+    const isKey = KEY_FIELDS.includes(f.key);
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (VISIBLE.has(f.key) ? ' on' : '') + (isKey ? ' key' : '');
+    chip.dataset.key = f.key;
+    chip.innerHTML = (isKey ? '★ ' : '') + f.label + ' <span class="ck">' + (VISIBLE.has(f.key) ? '✓' : '+') + '</span>';
+    chip.title = isKey ? 'Kolom penting (Nomor Referensi / Lokasi Tujuan)' : 'Klik untuk tampil/sembunyikan kolom';
+    chip.addEventListener('click', () => {
+      if(VISIBLE.has(f.key)) VISIBLE.delete(f.key); else VISIBLE.add(f.key);
+      buildColumnChips();
+      renderTable();
+    });
+    box.appendChild(chip);
   });
-
-  T1.output = out;
 }
-
-function t1Render() {
-  t1Generate();
-
-  const nSrc = T1.records.length;
-  const nFil = T1.filtered.length;
-  const nOut = T1.output.length;
-  const totalQty = T1.output.reduce((a, r) => a + num(r['Qty']), 0);
-  const nDoc = new Set(T1.output.map(r => r['Nomor Dokumen'])).size;
-
-  $('#t1-stats').innerHTML = `
-    <div class="stat b"><b>${nSrc}</b><span>Baris Sumber</span></div>
-    <div class="stat w"><b>${nFil}</b><span>Setelah Filter</span></div>
-    <div class="stat g"><b>${nOut}</b><span>Baris Output</span></div>
-    <div class="stat"><b>${nDoc}</b><span>Nomor Dokumen</span></div>
-    <div class="stat"><b>${totalQty}</b><span>Total Qty</span></div>
-  `;
-
-  renderTable('#t1-out', TMR_COLUMNS, T1.output, 300);
-
-  const srcCols = ['No','Nomor Dokumen','Part','Deskripsi','Qty','Satuan','Status','Tipe Transaksi'];
-  renderTable('#t1-src', srcCols, T1.filtered, 300);
-}
-
-function t1FileName(ext) {
-  const ref = ($('#s-ref').value || 'REF').replace(/[\/\\:*?"<>|]/g, '_');
-  const dmy = isoToDMY($('#s-tgl').value || todayISO()).replace(/\//g, '-');
-  return `INPUT DO ${ref} ${dmy}.${ext}`;
-}
-
-/* --- Event binding Tab 1 --- */
-wireDrop('#t1-drop', '#t1-file', t1Load);
-
-['#f-status','#f-tipe','#f-doc','#f-cari','#f-qty'].forEach(s =>
-  $(s).addEventListener('input', t1Render));
-
-$('#f-reset').addEventListener('click', () => {
-  $('#f-status').value = ''; $('#f-tipe').value = ''; $('#f-doc').value = '';
-  $('#f-cari').value = ''; $('#f-qty').value = '0';
-  t1Render();
+$('#btnColKey').addEventListener('click', () => {
+  VISIBLE = new Set(KEY_FIELDS);
+  buildColumnChips();
+  renderTable();
 });
-
-['#s-kode','#s-site','#s-lokasi','#s-nik','#s-pola','#s-seq','#s-mode','#s-ref',
- '#s-tipe','#s-status','#s-oleh','#s-tgl','#s-satuan','#s-conv','#s-permintaan','#s-parent']
-  .forEach(s => { $(s).addEventListener('input', t1Render); $(s).addEventListener('change', t1Render); });
-
-$('#t1-gen').addEventListener('click', t1Render);
-
-$('#t1-dl').addEventListener('click', () => {
-  if (!T1.output.length) { alert('Tidak ada data untuk diunduh.'); return; }
-  const aoa = [[], [], [], TMR_COLUMNS];
-  T1.output.forEach(r => aoa.push(TMR_COLUMNS.map(c => r[c])));
-  downloadAOA(aoa, 'Sheet1', t1FileName('xlsx'),
-    XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: TMR_COLUMNS.length - 1 } }));
-});
-
-$('#t1-csv').addEventListener('click', () => {
-  if (!T1.output.length) { alert('Tidak ada data untuk diunduh.'); return; }
-  const aoa = [TMR_COLUMNS];
-  T1.output.forEach(r => aoa.push(TMR_COLUMNS.map(c => r[c])));
-  downloadCSV(aoa, t1FileName('csv'));
-});
-
-$('#t1-to-tab2').addEventListener('click', () => {
-  if (!T1.output.length) { alert('Generate data terlebih dahulu.'); return; }
-  T2.tmr.headers = TMR_COLUMNS.slice();
-  T2.tmr.records = T1.output.map(r => Object.assign({}, r));
-  T2.tmr.source = 'Hasil Tab 1';
-  t2AfterLoad();
-  $$('.tab')[1].click();
-  msg('#t2-msg', `✅ ${T2.tmr.records.length} baris dari Tab 1 dimuat sebagai file TMR.`, 'ok');
+$('#btnColAll').addEventListener('click', () => {
+  VISIBLE = new Set(FIELDS.map(f => f.key));
+  buildColumnChips();
+  renderTable();
 });
 
 /* =========================================================
-   TAB 2 — ASA4 (TMR) + ASA10 (RSV) → INPUT DATA SMARTX
+   10. RENDER TABEL
    ========================================================= */
-const T2 = {
-  tmr: { headers: [], records: [], source: '' },
-  rsv: { headers: [], records: [], source: '' },
-  output: [], outHeaders: []
-};
+function renderTable(){
+  const thead = $('#thead');
+  const tbody = $('#tbody');
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
 
-async function t2LoadFile(file, which) {
-  try {
-    msg('#t2-msg', '⏳ Membaca file…', 'info');
-    const wb = await readWB(file);
-    const sheet = pickSheet(wb, which === 'tmr' ? ['Sheet1', 'INPUT DO', 'TMR'] : ['Sheet1', 'RSV', 'ASA10']);
-    const aoa = wbToAOA(wb, sheet);
-    const hIdx = detectHeader(aoa);
+  const cols = FIELDS.filter(f => VISIBLE.has(f.key));
 
-    if (hIdx < 0) {
-      msg('#t2-msg', `❌ Header tidak terdeteksi pada file ${which.toUpperCase()}.`, 'err');
-      return;
-    }
-    const { headers, records } = aoaToRecords(aoa, hIdx);
-    T2[which].headers = headers;
-    T2[which].records = records;
-    T2[which].source = file.name;
+  // header
+  const trh = document.createElement('tr');
+  const thG = document.createElement('th');
+  thG.className = 'gutter';
+  thG.textContent = 'No';
+  thG.style.minWidth = '50px';
+  trh.appendChild(thG);
 
-    $(which === 'tmr' ? '#t2-drop-tmr' : '#t2-drop-rsv').classList.add('loaded');
-    $(which === 'tmr' ? '#t2-drop-tmr' : '#t2-drop-rsv').querySelector('b').textContent = '✔ ' + file.name;
-    setInfo(which === 'tmr' ? '#t2-info-tmr' : '#t2-info-rsv',
-      `Sheet: <b>${esc(sheet)}</b> • <b>${records.length}</b> baris • <b>${headers.length}</b> kolom`);
+  cols.forEach(f => {
+    const th = document.createElement('th');
+    th.textContent = f.label;
+    th.style.minWidth = (WIDTHS[f.key] || 100) + 'px';
+    if(KEY_FIELDS.includes(f.key)) th.classList.add('colKey');
+    trh.appendChild(th);
+  });
+  thead.appendChild(trh);
 
-    msg('#t2-msg', `✅ File ${which.toUpperCase()} dimuat (${records.length} baris).`, 'ok');
-    t2AfterLoad();
-  } catch (err) {
-    console.error(err);
-    msg('#t2-msg', '❌ Gagal membaca file: ' + esc(err.message), 'err');
-  }
+  // empty states
+  const noRows = FILTERED.length === 0;
+  const noCols = cols.length === 0;
+  $('#emptyState').classList.toggle('hidden', !noRows || noCols);
+  $('#emptyColState').classList.toggle('hidden', !noCols);
+
+  const frag = document.createDocumentFragment();
+  FILTERED.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    const tdNo = document.createElement('td');
+    tdNo.className = 'gutter';
+    tdNo.textContent = i + 1;
+    tr.appendChild(tdNo);
+
+    cols.forEach(f => {
+      const td = document.createElement('td');
+      const val = r[f.key];
+      td.textContent = (val === undefined || val === null) ? '' : String(val);
+      if(KEY_FIELDS.includes(f.key)) td.classList.add('colKey');
+      if(f.key === 'deskripsi') td.classList.add('wrap');
+      if(['qty','conversionQty','conversionValue','pricePerUnit','totalValue'].includes(f.key)){
+        td.classList.add('num');
+      }
+      tr.appendChild(td);
+    });
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
 }
 
-function t2AfterLoad() {
-  const allHeaders = Array.from(new Set([...(T2.tmr.headers || []), ...(T2.rsv.headers || [])]));
-  if (!allHeaders.length) return;
-
-  const guess = (names, fallbackIdx = 0) => {
-    for (const n of names) {
-      const hit = allHeaders.find(h => normKey(h) === normKey(n));
-      if (hit) return hit;
-    }
-    return allHeaders[fallbackIdx] || '';
-  };
-
-  const fill = (sel, def) => {
-    const el = $(sel);
-    const cur = el.value;
-    el.innerHTML = allHeaders.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join('');
-    if (allHeaders.includes(cur)) el.value = cur;
-    else el.value = def;
-  };
-
-  const keyDef    = guess(['Part', 'Kode Part', 'Part Number', 'Kode Barang'], 0);
-  const qtyDef    = guess(['Qty', 'Quantity', 'Jumlah'], 0);
-  const descDef   = guess(['Deskripsi', 'Description', 'Nama Barang'], 0);
-  const satDef    = guess(['Satuan', 'UOM', 'Unit'], 0);
-  const docDef    = guess(['Nomor Dokumen', 'No Dokumen', 'No Bukti'], 0);
-
-  fill('#t2-key', keyDef);
-  fill('#t2-qty', qtyDef);
-  fill('#t2-desc', descDef);
-  fill('#t2-satuan', satDef);
-  fill('#t2-doc', docDef);
-
-  $('#t2-param').style.display = '';
-  $('#t2-hasil').style.display = '';
-  t2Render();
+function updateStats(){
+  $('#statRows').innerHTML =
+    'Menampilkan <b>' + FILTERED.length.toLocaleString('id-ID') + '</b> dari <b>' +
+    ROWS.length.toLocaleString('id-ID') + '</b> baris · <b>' +
+    FIELDS.filter(f => VISIBLE.has(f.key)).length + '</b>/' + FIELDS.length + ' kolom';
+  $('#statSheet').textContent =
+    'Header: ' + (RAW.h.name || '-') + '  •  Detail: ' + (RAW.d.name || '-');
 }
 
-function t2Render() {
-  const keyCol  = $('#t2-key').value;
-  const qtyCol  = $('#t2-qty').value;
-  const descCol = $('#t2-desc').value;
-  const satCol  = $('#t2-satuan').value;
-  const docCol  = $('#t2-doc').value;
-  const mode    = $('#t2-mode').value;
+/* =========================================================
+   11. EVENT FILTER
+   ========================================================= */
+['f_ref','f_lok','f_doc','f_type','f_status','f_company','f_site','f_text','f_date1','f_date2']
+  .forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', applyFilters);
+    el.addEventListener('change', applyFilters);
+  });
 
-  const tmrRows = T2.tmr.records || [];
-  const rsvRows = T2.rsv.records || [];
+$('#btnReset').addEventListener('click', () => {
+  ['f_ref','f_lok','f_doc','f_type','f_status','f_company','f_site']
+    .forEach(id => document.getElementById(id).value = '');
+  $('#f_text').value = '';
+  $('#f_date1').value = '';
+  $('#f_date2').value = '';
+  applyFilters();
+});
 
-  if (!tmrRows.length && !rsvRows.length) {
-    T2.output = []; T2.outHeaders = [];
-    $('#t2-stats').innerHTML = '';
-    $('#t2-out').innerHTML = '<div class="empty">Muat file TMR dan/atau RSV terlebih dahulu.</div>';
+/* =========================================================
+   12. MODAL MAPPING
+   ========================================================= */
+let mapRowsRef = [];
+
+$('#btnMapping').addEventListener('click', openMapping);
+$('#modalClose').addEventListener('click', () => $('#modal').classList.add('hidden'));
+$('#modal').addEventListener('click', e => { if(e.target.id === 'modal') $('#modal').classList.add('hidden'); });
+
+function openMapping(){
+  const body = $('#mapBody');
+  body.innerHTML = '';
+  mapRowsRef = [];
+
+  const table = document.createElement('table');
+  table.className = 'map';
+  table.innerHTML = '<thead><tr><th style="width:240px">Kolom Output</th><th style="width:220px">Sumber Sheet</th><th>Kolom Sumber</th></tr></thead>';
+  const tb = document.createElement('tbody');
+
+  FIELDS.forEach(f => {
+    const m = MAPPING[f.key] || {sheet:f.src, col:null};
+    const tr = document.createElement('tr');
+
+    const td1 = document.createElement('td');
+    td1.innerHTML = '<b>' + f.label + '</b>';
+    if(KEY_FIELDS.includes(f.key)){
+      const b = document.createElement('span');
+      b.className = 'badge key';
+      b.textContent = '★ penting';
+      td1.appendChild(b);
+    }
+    if(!m.col){
+      const b = document.createElement('span');
+      b.className = 'badge warn';
+      b.textContent = 'belum terpetakan';
+      td1.appendChild(b);
+    }
+
+    const td2 = document.createElement('td');
+    const selSheet = document.createElement('select');
+    [['H','Goods Transaction'],['D','Goods Transaction Detail']].forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = t;
+      selSheet.appendChild(o);
+    });
+    selSheet.value = m.sheet;
+    td2.appendChild(selSheet);
+
+    const td3 = document.createElement('td');
+    const selCol = document.createElement('select');
+    const fillCols = () => {
+      const src = selSheet.value === 'H' ? RAW.h : RAW.d;
+      selCol.innerHTML = '';
+      const o0 = document.createElement('option');
+      o0.value = ''; o0.textContent = '— tidak dipakai —';
+      selCol.appendChild(o0);
+      src.headers.forEach(h => {
+        const o = document.createElement('option');
+        o.value = h; o.textContent = h;
+        selCol.appendChild(o);
+      });
+      selCol.value = (m.sheet === selSheet.value && m.col) ? m.col : '';
+    };
+    fillCols();
+    selSheet.addEventListener('change', () => { m.sheet = selSheet.value; m.col = null; fillCols(); });
+    td3.appendChild(selCol);
+
+    tr.append(td1, td2, td3);
+    tb.appendChild(tr);
+    mapRowsRef.push({field:f, selSheet, selCol, row:tr});
+  });
+
+  table.appendChild(tb);
+  body.appendChild(table);
+
+  const mapped = FIELDS.filter(f => MAPPING[f.key] && MAPPING[f.key].col).length;
+  $('#mapInfo').textContent = mapped + ' / ' + FIELDS.length + ' kolom berhasil dipetakan otomatis';
+  $('#modal').classList.remove('hidden');
+}
+
+$('#btnAutoMap').addEventListener('click', () => {
+  autoMap();
+  openMapping();
+});
+
+$('#btnApplyMap').addEventListener('click', () => {
+  mapRowsRef.forEach(r => {
+    MAPPING[r.field.key] = {
+      sheet: r.selSheet.value,
+      col: r.selCol.value || null
+    };
+  });
+  buildRows();
+  populateFilters();
+  applyFilters();
+  $('#modal').classList.add('hidden');
+  setStatus('Mapping diterapkan. Total output: ' + ROWS.length + ' baris.', 'ok');
+});
+
+/* =========================================================
+   13. EXPORT EXCEL
+   ========================================================= */
+$('#btnExport').addEventListener('click', () => {
+  if(!FILTERED.length){
+    setStatus('Tidak ada data untuk diexport.', 'error');
     return;
   }
 
-  let output = [], headers = [];
+  const cols = FIELDS.filter(f => VISIBLE.has(f.key));
+  const blank = Math.max(0, Math.min(10, parseInt($('#blankRows').value || '0', 10) || 0));
+  const nCol = cols.length + 1;
+  const aoa = [];
 
-  if (mode === 'rekap') {
-    const map = new Map();
-    const ensure = k => {
-      if (!map.has(k)) map.set(k, {
-        key: k, desc: '', satuan: '',
-        qTmr: 0, qRsv: 0, nTmr: 0, nRsv: 0,
-        docTmr: new Set(), refTmr: new Set(), docRsv: new Set()
-      });
-      return map.get(k);
-    };
+  for(let i = 0; i < blank; i++) aoa.push(new Array(nCol).fill(''));
+  aoa.push(['No', ...cols.map(f => f.label)]);
 
-    tmrRows.forEach(r => {
-      const k = pick(r, [keyCol]);
-      if (!k) return;
-      const e = ensure(k);
-      e.qTmr += num(pick(r, [qtyCol]));
-      e.nTmr++;
-      if (!e.desc)   e.desc   = pick(r, [descCol]);
-      if (!e.satuan) e.satuan = pick(r, [satCol]);
-      const d = pick(r, [docCol]); if (d) e.docTmr.add(d);
-      const rf = pick(r, ['Nomor Referensi']); if (rf) e.refTmr.add(rf);
-    });
+  FILTERED.forEach((r, i) => {
+    aoa.push([i + 1, ...cols.map(f => {
+      const v = r[f.key];
+      return (v === undefined || v === null) ? '' : v;
+    })]);
+  });
 
-    rsvRows.forEach(r => {
-      const k = pick(r, [keyCol]);
-      if (!k) return;
-      const e = ensure(k);
-      e.qRsv += num(pick(r, [qtyCol]));
-      e.nRsv++;
-      if (!e.desc)   e.desc   = pick(r, [descCol]);
-      if (!e.satuan) e.satuan = pick(r, [satCol]);
-      const d = pick(r, [docCol]); if (d) e.docRsv.add(d);
-    });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:6}, ...cols.map(f => ({wch: Math.max(10, Math.min(45, WIDTHS[f.key] ? WIDTHS[f.key]/8 + 6 : 16))}))];
+  ws['!freeze'] = { xSplit:0, ySplit: blank + 1 };
 
-    headers = ['No', keyCol, 'Deskripsi', 'Satuan', 'Qty TMR', 'Qty RSV', 'Selisih', 'Status',
-               'Nomor Dokumen TMR', 'Nomor Referensi TMR', 'Nomor Dokumen RSV', 'Keterangan'];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-    let i = 0;
-    Array.from(map.values())
-      .sort((a, b) => String(a.key).localeCompare(String(b.key)))
-      .forEach(e => {
-        const selisih = +(e.qTmr - e.qRsv).toFixed(4);
-        let status, ket;
-        if (e.nTmr && e.nRsv) {
-          if (selisih === 0) { status = 'MATCH'; ket = 'Qty TMR = Qty RSV'; }
-          else { status = 'SELISIH'; ket = `TMR ${e.qTmr} vs RSV ${e.qRsv}`; }
-        } else if (e.nTmr) { status = 'HANYA TMR'; ket = 'Tidak ada di RSV'; }
-        else { status = 'HANYA RSV'; ket = 'Tidak ada di TMR'; }
-
-        output.push({
-          'No': ++i,
-          [keyCol]: e.key,
-          'Deskripsi': e.desc,
-          'Satuan': e.satuan,
-          'Qty TMR': e.qTmr,
-          'Qty RSV': e.qRsv,
-          'Selisih': selisih,
-          'Status': status,
-          'Nomor Dokumen TMR': Array.from(e.docTmr).join(', '),
-          'Nomor Referensi TMR': Array.from(e.refTmr).join(', '),
-          'Nomor Dokumen RSV': Array.from(e.docRsv).join(', '),
-          'Keterangan': ket
-        });
-      });
-
-  } else {
-    headers = ['No','Sumber','Kode Perusahaan','Site','Nomor Dokumen','Nomor Referensi',
-               'Lokasi Tujuan','Tipe Transaksi', keyCol, 'Deskripsi','Qty','Satuan','Status'];
-
-    let i = 0;
-    tmrRows.forEach(r => {
-      output.push({
-        'No': ++i, 'Sumber': 'TMR',
-        'Kode Perusahaan': pick(r, ['Kode Perusahaan']),
-        'Site': pick(r, ['Site']),
-        'Nomor Dokumen': pick(r, [docCol]),
-        'Nomor Referensi': pick(r, ['Nomor Referensi']),
-        'Lokasi Tujuan': pick(r, ['Lokasi Tujuan']),
-        'Tipe Transaksi': pick(r, ['Tipe Transaksi']),
-        [keyCol]: pick(r, [keyCol]),
-        'Deskripsi': pick(r, [descCol]),
-        'Qty': num(pick(r, [qtyCol])),
-        'Satuan': pick(r, [satCol]),
-        'Status': pick(r, ['Status'])
-      });
-    });
-    rsvRows.forEach(r => {
-      output.push({
-        'No': ++i, 'Sumber': 'RSV',
-        'Kode Perusahaan': pick(r, ['Kode Perusahaan']),
-        'Site': pick(r, ['Site']),
-        'Nomor Dokumen': pick(r, [docCol]),
-        'Nomor Referensi': pick(r, ['Nomor Referensi']),
-        'Lokasi Tujuan': pick(r, ['Lokasi Tujuan']),
-        'Tipe Transaksi': pick(r, ['Tipe Transaksi']),
-        [keyCol]: pick(r, [keyCol]),
-        'Deskripsi': pick(r, [descCol]),
-        'Qty': num(pick(r, [qtyCol])),
-        'Satuan': pick(r, [satCol]),
-        'Status': pick(r, ['Status'])
-      });
-    });
+  const refs = [...new Set(FILTERED.map(r => String(r.nomorReferensi || '').trim()).filter(Boolean))];
+  let fname;
+  if(refs.length === 1){
+    fname = refs[0].replace(/[\/\\:*?"<>|]/g, '_') + '.xlsx';
+  }else{
+    const base = (SOURCE_FILENAME || 'extract').replace(/\.(xlsx|xls|xlsm)$/i, '');
+    fname = 'EXTRACT_' + base.replace(/[\/\\:*?"<>|]/g, '_') + '.xlsx';
   }
 
-  T2.output = output;
-  T2.outHeaders = headers;
-
-  /* Statistik */
-  const nMatch   = output.filter(r => r['Status'] === 'MATCH').length;
-  const nSelisih = output.filter(r => r['Status'] === 'SELISIH').length;
-  const nTmrOnly = output.filter(r => r['Status'] === 'HANYA TMR').length;
-  const nRsvOnly = output.filter(r => r['Status'] === 'HANYA RSV').length;
-
-  if (mode === 'rekap') {
-    $('#t2-stats').innerHTML = `
-      <div class="stat b"><b>${tmrRows.length}</b><span>Baris TMR</span></div>
-      <div class="stat b"><b>${rsvRows.length}</b><span>Baris RSV</span></div>
-      <div class="stat g"><b>${nMatch}</b><span>Match</span></div>
-      <div class="stat w"><b>${nSelisih}</b><span>Selisih</span></div>
-      <div class="stat r"><b>${nTmrOnly + nRsvOnly}</b><span>Tidak Berpasangan</span></div>
-      <div class="stat"><b>${output.length}</b><span>Total Baris Output</span></div>
-    `;
-  } else {
-    $('#t2-stats').innerHTML = `
-      <div class="stat b"><b>${tmrRows.length}</b><span>Baris TMR</span></div>
-      <div class="stat b"><b>${rsvRows.length}</b><span>Baris RSV</span></div>
-      <div class="stat g"><b>${output.length}</b><span>Total Baris Output</span></div>
-    `;
-  }
-
-  renderTable('#t2-out', headers, output, 400);
-}
-
-/* --- Event binding Tab 2 --- */
-wireDrop('#t2-drop-tmr', '#t2-file-tmr', f => t2LoadFile(f, 'tmr'));
-wireDrop('#t2-drop-rsv', '#t2-file-rsv', f => t2LoadFile(f, 'rsv'));
-
-['#t2-key','#t2-qty','#t2-desc','#t2-satuan','#t2-doc','#t2-mode'].forEach(s =>
-  $(s).addEventListener('change', t2Render));
-
-$('#t2-gen').addEventListener('click', t2Render);
-
-$('#t2-use-tab1').addEventListener('click', () => {
-  if (!T1.output.length) { alert('Tab 1 belum menghasilkan data. Silakan proses file MSK terlebih dahulu.'); return; }
-  T2.tmr.headers = TMR_COLUMNS.slice();
-  T2.tmr.records = T1.output.map(r => Object.assign({}, r));
-  T2.tmr.source = 'Hasil Tab 1';
-  $('#t2-drop-tmr').classList.add('loaded');
-  $('#t2-drop-tmr').querySelector('b').textContent = '✔ Hasil Tab 1 (INPUT DO)';
-  setInfo('#t2-info-tmr', `<b>${T2.tmr.records.length}</b> baris dari Tab 1`);
-  t2AfterLoad();
-  msg('#t2-msg', `✅ ${T2.tmr.records.length} baris dari Tab 1 dimuat sebagai file TMR.`, 'ok');
-});
-
-$('#t2-reset').addEventListener('click', () => {
-  T2.tmr = { headers: [], records: [], source: '' };
-  T2.rsv = { headers: [], records: [], source: '' };
-  T2.output = [];
-  $('#t2-drop-tmr').classList.remove('loaded');
-  $('#t2-drop-tmr').querySelector('b').textContent = 'Klik / tarik file TMR';
-  $('#t2-drop-rsv').classList.remove('loaded');
-  $('#t2-drop-rsv').querySelector('b').textContent = 'Klik / tarik file RSV';
-  setInfo('#t2-info-tmr', ''); setInfo('#t2-info-rsv', '');
-  $('#t2-param').style.display = 'none';
-  $('#t2-hasil').style.display = 'none';
-  hideMsg('#t2-msg');
-  $('#t2-out').innerHTML = '';
-});
-
-$('#t2-dl').addEventListener('click', () => {
-  if (!T2.output.length) { alert('Tidak ada data untuk diunduh.'); return; }
-  const aoa = [T2.outHeaders];
-  T2.output.forEach(r => aoa.push(T2.outHeaders.map(h => r[h])));
-  const stamp = isoToDMY(todayISO()).replace(/\//g, '-');
-  downloadAOA(aoa, 'Sheet1', `INPUT DATA SMARTX ${stamp}.xlsx`);
-});
-
-$('#t2-csv').addEventListener('click', () => {
-  if (!T2.output.length) { alert('Tidak ada data untuk diunduh.'); return; }
-  const aoa = [T2.outHeaders];
-  T2.output.forEach(r => aoa.push(T2.outHeaders.map(h => r[h])));
-  const stamp = isoToDMY(todayISO()).replace(/\//g, '-');
-  downloadCSV(aoa, `INPUT DATA SMARTX ${stamp}.csv`);
+  XLSX.writeFile(wb, fname);
+  setStatus('✔ Export selesai: ' + fname + ' (' + FILTERED.length + ' baris, ' + cols.length + ' kolom)', 'ok');
 });
 
 /* =========================================================
-   INISIALISASI
+   14. INIT
    ========================================================= */
-$('#s-tgl').value = todayISO();
-$('#s-ref').value = (() => {
-  const { y, m } = dmyToParts(isoToDMY(todayISO()));
-  return `TKR/PST/SV/${y.slice(2)}/${m}/001`;
-})();
+setStatus('Silakan pilih / tarik file Excel untuk memulai.', 'info');
 </script>
 </body>
 </html>
