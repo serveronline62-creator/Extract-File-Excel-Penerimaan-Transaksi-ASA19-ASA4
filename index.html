@@ -257,7 +257,13 @@ const COL_ALIASES = {
 /* Alias nama kolom khusus sheet "Goods Transaction" */
 const GT_ALIASES = {
   ref:    ["nomor referensi","no referensi","noreferensi","referensi","reference","ref no","ref no.","ref"],
-  lokasi: ["lokasi sampai","lokasi tujuan","lokasi tujuan/sampai","tujuan","destination","lokasi"]
+  lokasi: ["lokasi sampai","lokasi tujuan","lokasi tujuan/sampai","tujuan","destination","lokasi"],
+  status: ["status"],
+  diupdateTanggal: [
+    "diupdate tanggal","diupdate tgl","tanggal diupdate","tgl diupdate",
+    "update tanggal","tanggal update","updated date","update date",
+    "diupdate pada","last update date"
+  ]
 };
 
 const MAX_PREVIEW_ROWS = 800;
@@ -281,7 +287,11 @@ const TAB_CONFIGS = {
     columns: TAP2_COLUMNS,
     dateFormat: "dmy",
     defaultBlankRows: true,
-    excludedDetailColumns: TAP2_EXCLUDED_COLUMNS
+    excludedDetailColumns: TAP2_EXCLUDED_COLUMNS,
+    gtOverrides: {
+      statusFromGT: true,   // Status ← kolom Status sheet Goods Transaction
+      dateFromGT:   true    // Dibuat Pada & Dikonfirmasi Pada ← kolom Diupdate Tanggal (tanggal saja)
+    }
   }
 };
 
@@ -333,6 +343,22 @@ function formatDateForTab(value, fmt){
   if (isNaN(d)) return s;
   return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ` +
          `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+/* Ambil TANGGAL saja (tanpa jam) dari nilai apa pun:
+   Date object, serial number Excel, atau teks tanggal */
+function formatDateOnlyValue(value, fmt){
+  if (value === null || value === undefined || value === "" || value === 0) return "";
+  if (typeof value === "number"){
+    try {
+      const pattern = fmt === "dmy" ? "dd/mm/yyyy" : "yyyy-mm-dd";
+      const result = XLSX.SSF.format(pattern, value);
+      if (result && !String(result).includes("#")) return result;
+    } catch(e){ /* lanjut ke fallback */ }
+  }
+  const formatted = formatDateForTab(value, fmt);
+  if (fmt !== "dmy") return String(formatted).split(" ")[0];
+  return formatted;
 }
 
 function todayStamp(){
@@ -425,6 +451,19 @@ class TabController {
 
     const checkedBlank = cfg.defaultBlankRows ? "checked" : "";
 
+    const overrideNote = cfg.gtOverrides
+      ? `<div class="info ok" style="margin-top:0">
+           <span class="ico">ℹ️</span>
+           <div>
+             <b>Khusus ${escapeHtml(cfg.label)}:</b>
+             kolom <b>Status</b> diambil dari kolom <code>Status</code> sheet <b>Goods Transaction</b>;
+             kolom <b>Dibuat Pada</b> dan <b>Dikonfirmasi Pada</b> disalin dari kolom
+             <code>Diupdate Tanggal</code> sheet <b>Goods Transaction</b>
+             — hanya <b>tanggalnya</b> (tanpa jam).
+           </div>
+         </div>`
+      : "";
+
     panel.innerHTML = `
       <section class="card">
         <h2>1. Unggah File Excel — ${cfg.label}</h2>
@@ -435,7 +474,9 @@ class TabController {
           Kolom <b>Diubah Oleh</b> / <b>Diubah Pada</b> otomatis diisi dari <b>Dibuat Oleh</b> / <b>Dibuat Pada</b> jika kosong.
         </p>
 
-        <label class="drop" id="drop-${p}" for="file-${p}">
+        ${overrideNote}
+
+        <label class="drop" id="drop-${p}" for="file-${p}" style="margin-top:14px">
           <div class="ico">📄</div>
           <b>Klik untuk memilih file, atau tarik &amp; lepas di sini</b>
           <span>File diproses sepenuhnya di browser Anda — tidak diunggah ke server.</span>
@@ -699,7 +740,8 @@ class TabController {
         const H = (aoa[i] || []).map(norm);
         const hasRef = H.some(h => GT_ALIASES.ref.some(a => h === a));
         const hasLok = H.some(h => GT_ALIASES.lokasi.some(a => h === a));
-        if (hasRef || hasLok){ headerIdx = i; break; }
+        const hasSta = H.some(h => GT_ALIASES.status.some(a => h === a));
+        if (hasRef || hasLok || hasSta){ headerIdx = i; break; }
       }
       if (headerIdx === -1) continue;
 
@@ -708,12 +750,14 @@ class TabController {
       const idx = {
         ref:    findColumnIndex(headers, GT_ALIASES.ref),
         lokasi: findColumnIndex(headers, GT_ALIASES.lokasi),
+        status: findColumnIndex(headers, GT_ALIASES.status),
+        diupdateTanggal: findColumnIndex(headers, GT_ALIASES.diupdateTanggal),
         doc:    findColumnIndex(headers, COL_ALIASES.nomorDokumen),
         baris:  findColumnIndex(headers, COL_ALIASES.baris),
         part:   findColumnIndex(headers, COL_ALIASES.part)
       };
 
-      if (idx.ref === -1 && idx.lokasi === -1) continue;
+      if (idx.ref === -1 && idx.lokasi === -1 && idx.status === -1) continue;
 
       const map = new Map();
       const records = [];
@@ -726,12 +770,14 @@ class TabController {
           raw,
           ref:    idx.ref    >= 0 ? String(raw[idx.ref]    ?? "").trim() : "",
           lokasi: idx.lokasi >= 0 ? String(raw[idx.lokasi] ?? "").trim() : "",
+          status: idx.status >= 0 ? String(raw[idx.status] ?? "").trim() : "",
+          diupdateTanggal: idx.diupdateTanggal >= 0 ? raw[idx.diupdateTanggal] : "",
           doc:    idx.doc    >= 0 ? String(raw[idx.doc]    ?? "").trim() : "",
           baris:  idx.baris  >= 0 ? String(raw[idx.baris]  ?? "").trim() : "",
           part:   idx.part   >= 0 ? String(raw[idx.part]   ?? "").trim() : ""
         };
 
-        if (!rec.ref && !rec.lokasi) continue;
+        if (!rec.ref && !rec.lokasi && !rec.status) continue;
 
         records.push(rec);
 
@@ -752,7 +798,9 @@ class TabController {
         columnIndexes: idx,
         matchedCols: {
           ref:    idx.ref    >= 0 ? headers[idx.ref]    : null,
-          lokasi: idx.lokasi >= 0 ? headers[idx.lokasi] : null
+          lokasi: idx.lokasi >= 0 ? headers[idx.lokasi] : null,
+          status: idx.status >= 0 ? headers[idx.status] : null,
+          diupdateTanggal: idx.diupdateTanggal >= 0 ? headers[idx.diupdateTanggal] : null
         }
       };
     }
@@ -927,7 +975,9 @@ class TabController {
     /* --- ENRICHMENT #2: sheet Goods Transaction --- */
     const gt = this.detectGoodsTransactionSheet(sheetName);
     if (gt){
+      const ov = this.cfg.gtOverrides || {};
       let matched = 0, filledRef = 0, filledLokasi = 0;
+      let filledStatus = 0, filledDibuat = 0, filledKonfirmasi = 0;
 
       rows.forEach(row => {
         const rec = this.lookupGoodsTransaction(gt, row);
@@ -942,14 +992,39 @@ class TabController {
           row["Lokasi Tujuan"] = rec.lokasi;
           filledLokasi++;
         }
+
+        /* KHUSUS TAP 2 — Status diambil dari sheet Goods Transaction */
+        if (ov.statusFromGT && rec.status){
+          row["Status"] = rec.status;
+          filledStatus++;
+        }
+
+        /* KHUSUS TAP 2 — Dibuat Pada & Dikonfirmasi Pada
+           disalin dari kolom "Diupdate Tanggal" (TANGGAL saja, tanpa jam) */
+        if (ov.dateFromGT){
+          const tgl = formatDateOnlyValue(rec.diupdateTanggal, this.cfg.dateFormat);
+          if (tgl){
+            if (this.cfg.columns.includes("Dibuat Pada")){
+              row["Dibuat Pada"] = tgl;
+              filledDibuat++;
+            }
+            if (this.cfg.columns.includes("Dikonfirmasi Pada")){
+              row["Dikonfirmasi Pada"] = tgl;
+              filledKonfirmasi++;
+            }
+          }
+        }
       });
 
       this.state.gtInfo = {
         sheetName: gt.sheetName,
         count: gt.records.length,
         matched, filledRef, filledLokasi,
+        filledStatus, filledDibuat, filledKonfirmasi,
         refCol: gt.matchedCols.ref,
-        lokasiCol: gt.matchedCols.lokasi
+        lokasiCol: gt.matchedCols.lokasi,
+        statusCol: gt.matchedCols.status,
+        tanggalCol: gt.matchedCols.diupdateTanggal
       };
     } else {
       this.state.gtInfo = null;
@@ -972,6 +1047,7 @@ class TabController {
     const info = this.state.detailInfo;
     const gt   = this.state.gtInfo;
     const af   = this.state.autoFillInfo;
+    const ov   = this.cfg.gtOverrides || {};
     box.innerHTML = "";
     box.classList.remove("hidden");
 
@@ -1027,6 +1103,14 @@ class TabController {
           </div>
         </div>`;
     } else {
+      const gtExtra = [];
+      if (ov.statusFromGT && gt.statusCol){
+        gtExtra.push(`Kolom <b>Status</b> diambil dari <code>${escapeHtml(gt.statusCol)}</code> — <b>${gt.filledStatus.toLocaleString("id-ID")}</b> baris.`);
+      }
+      if (ov.dateFromGT && gt.tanggalCol){
+        gtExtra.push(`Kolom <b>Dibuat Pada</b> &amp; <b>Dikonfirmasi Pada</b> disalin dari <code>${escapeHtml(gt.tanggalCol)}</code> — <b>tanggal saja, tanpa jam</b> (${gt.filledDibuat.toLocaleString("id-ID")} baris).`);
+      }
+
       html += `
         <div class="info ok">
           <span class="ico">✅</span>
@@ -1040,6 +1124,7 @@ class TabController {
             Baris utama yang cocok: <b>${gt.matched.toLocaleString("id-ID")}</b>.
             Nilai diisi ke kolom kosong: Nomor Referensi <b>${gt.filledRef}</b>,
             Lokasi Tujuan <b>${gt.filledLokasi}</b>.
+            ${gtExtra.length ? "<br>" + gtExtra.join("<br>") : ""}
           </div>
         </div>`;
     }
