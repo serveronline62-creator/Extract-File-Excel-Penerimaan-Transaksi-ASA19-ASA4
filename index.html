@@ -143,12 +143,6 @@
 
   <header class="top">
     <h1>Filter &amp; Extract File Excel Penerimaan Transaksi ASA19 & ASA4</h1>
-    <p>
-      Kolom <b>Part</b>, <b>Deskripsi</b>, dan kolom tambahan dari sheet <b>Detail</b> otomatis ditampilkan.
-      Kolom <b>Nomor Referensi</b> diambil dari kolom <b>Referensi</b> dan <b>Lokasi Tujuan</b> diambil dari
-      kolom <b>Lokasi Sampai</b> pada sheet <b>Goods Transaction</b>.
-      Kolom <b>Diubah Oleh</b> dan <b>Diubah Pada</b> otomatis diisi dari <b>Dibuat Oleh</b> dan <b>Dibuat Pada</b> bila kosong.
-    </p>
   </header>
 
   <div class="tabs" id="tabsBar"></div>
@@ -189,9 +183,6 @@ const TAP2_COLUMNS = [
   "Dikonfirmasi Oleh","Dikonfirmasi Pada","Diubah Oleh","Diubah Pada"
 ];
 
-/* -------------------------------------------------------------------------
-   DAFTAR KOLOM YANG DIHAPUS / TIDAK DITAMPILKAN (khusus TAP 2)
-   ------------------------------------------------------------------------- */
 const TAP2_EXCLUDED_COLUMNS = [
   "Tipe Cetak",
   "Um",
@@ -232,7 +223,6 @@ const TEXT_COLS = new Set([
   "Mata Uang","Site Parent","Dibuat Oleh","Dikonfirmasi Oleh","Diubah Oleh"
 ]);
 
-/* Alias kolom pada sheet utama */
 const MAIN_COL_ALIASES = {
   "Nomor Referensi": [
     "Nomor Referensi","No Referensi","Nomer Referensi","Nomor Ref",
@@ -244,7 +234,6 @@ const MAIN_COL_ALIASES = {
   ]
 };
 
-/* Alias nama kolom (untuk deteksi otomatis di sheet Detail) */
 const COL_ALIASES = {
   part: ["part","kode part","kode_part","kodeitem","kode item","part number","partnumber","part no","partno","item","item code"],
   deskripsi: ["deskripsi","description","desc","nama part","part name","nama item","item name","keterangan"],
@@ -255,7 +244,6 @@ const COL_ALIASES = {
   no: ["no","nomor","no urut","no_urut"]
 };
 
-/* Alias nama kolom khusus sheet "Goods Transaction" */
 const GT_ALIASES = {
   ref:    ["nomor referensi","no referensi","noreferensi","referensi","reference","ref no","ref no.","ref"],
   lokasi: ["lokasi sampai","lokasi tujuan","lokasi tujuan/sampai","tujuan","destination","lokasi"],
@@ -290,11 +278,11 @@ const TAB_CONFIGS = {
     defaultBlankRows: true,
     excludedDetailColumns: TAP2_EXCLUDED_COLUMNS,
     gtOverrides: {
-      statusFromGT: true,   // Status ← kolom Status sheet Goods Transaction
-      dateFromGT:   true    // Dibuat Pada & Dikonfirmasi Pada ← kolom Diupdate Tanggal (tanggal saja)
+      statusFromGT: true,
+      dateFromGT:   true
     },
     detailOverrides: {
-      satuanFromUM: true    // Satuan ← kolom UM sheet Detail (Goods Transaction Detail)
+      satuanFromUM: true
     }
   }
 };
@@ -349,8 +337,6 @@ function formatDateForTab(value, fmt){
          `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 
-/* Ambil TANGGAL saja (tanpa jam) dari nilai apa pun:
-   Date object, serial number Excel, atau teks tanggal */
 function formatDateOnlyValue(value, fmt){
   if (value === null || value === undefined || value === "" || value === 0) return "";
   if (typeof value === "number"){
@@ -379,7 +365,6 @@ function toast(msg){
   toastTm = setTimeout(() => t.classList.remove("show"), 2800);
 }
 
-/* Modal konfirmasi (Promise-based) */
 function confirmDialog(title, message, okLabel){
   return new Promise(resolve => {
     const modal = $("modalConfirm");
@@ -455,54 +440,28 @@ class TabController {
 
     const checkedBlank = cfg.defaultBlankRows ? "checked" : "";
 
-    const overrideItems = [];
-    if (cfg.detailOverrides && cfg.detailOverrides.satuanFromUM){
-      overrideItems.push(
-        `kolom <b>Satuan</b> diambil dari kolom <code>UM</code> sheet <b>Detail</b> (Goods Transaction Detail)`
-      );
-    }
-    if (cfg.gtOverrides && cfg.gtOverrides.statusFromGT){
-      overrideItems.push(
-        `kolom <b>Status</b> diambil dari kolom <code>Status</code> sheet <b>Goods Transaction</b>`
-      );
-    }
-    if (cfg.gtOverrides && cfg.gtOverrides.dateFromGT){
-      overrideItems.push(
-        `kolom <b>Dibuat Pada</b> &amp; <b>Dikonfirmasi Pada</b> disalin dari kolom <code>Diupdate Tanggal</code> sheet <b>Goods Transaction</b> — hanya <b>tanggalnya</b> (tanpa jam)`
-      );
-    }
-    const overrideNote = overrideItems.length
-      ? `<div class="info ok" style="margin-top:0">
-           <span class="ico">ℹ️</span>
-           <div>
-             <b>Khusus ${escapeHtml(cfg.label)}:</b>
-             ${overrideItems.join("; ")}.
-           </div>
-         </div>`
-      : "";
-
     panel.innerHTML = `
       <section class="card">
         <h2>1. Unggah File Excel — ${cfg.label}</h2>
-        <p class="sub">
-          Format <code>.xlsx</code> / <code>.xls</code> / <code>.csv</code>.
-          Kolom <b>Part</b>, <b>Deskripsi</b>, dan kolom tambahan akan dilengkapi otomatis dari sheet <b>Detail</b>.
-          Kolom <b>Nomor Referensi</b> &amp; <b>Lokasi Tujuan</b> akan dilengkapi dari sheet <b>Goods Transaction</b>.
-          Kolom <b>Diubah Oleh</b> / <b>Diubah Pada</b> otomatis diisi dari <b>Dibuat Oleh</b> / <b>Dibuat Pada</b> jika kosong.
-        </p>
 
-        ${overrideNote}
-
-        <label class="drop" id="drop-${p}" for="file-${p}" style="margin-top:14px">
+        <label class="drop" id="drop-${p}" for="file-${p}" style="margin-top:6px">
           <div class="ico">📄</div>
           <b>Klik untuk memilih file, atau tarik &amp; lepas di sini</b>
           <span>File diproses sepenuhnya di browser Anda — tidak diunggah ke server.</span>
         </label>
         <input type="file" id="file-${p}" accept=".xlsx,.xls,.xlsm,.csv" />
 
-        <div id="sheetBox-${p}" class="field hidden" style="margin-top:16px;max-width:340px">
-          <label for="sheetSelect-${p}">Pilih Sheet Utama</label>
-          <select id="sheetSelect-${p}"></select>
+        <div id="sheetBox-${p}" class="hidden" style="margin-top:16px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;">
+          <div class="field" style="min-width:260px; max-width:340px; flex:0 0 auto;">
+            <label for="sheetSelect-${p}">Pilih Sheet Utama</label>
+            <select id="sheetSelect-${p}"></select>
+          </div>
+          <div class="actions" style="border:none; padding:0; margin:0; flex:1; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end;">
+            <label class="chk"><input type="checkbox" id="chkRenumber-${p}" checked /> Nomor ulang kolom "No"</label>
+            <label class="chk"><input type="checkbox" id="chkBlank-${p}" ${checkedBlank} /> Sertakan 3 baris kosong</label>
+            <button class="btn-danger" id="btnClear-${p}" title="Hapus semua data yang sudah diunggah">🗑 Hapus Semua Data</button>
+            <button class="btn-ok" id="btnExport-${p}">⬇ Download Excel (${cfg.label})</button>
+          </div>
         </div>
 
         <div id="detailInfo-${p}" class="hidden"></div>
@@ -531,17 +490,11 @@ class TabController {
         <div class="actions">
           <button class="btn-ghost" id="btnReset-${p}">↺ Reset Filter</button>
           <button class="btn-warn" id="btnDelFiltered-${p}" title="Hapus baris yang sedang tampil dari data">🗑 Hapus Baris Terfilter</button>
-          <button class="btn-danger" id="btnClear-${p}" title="Hapus semua data yang sudah diunggah">🗑 Hapus Semua Data</button>
-          <label class="chk"><input type="checkbox" id="chkRenumber-${p}" checked /> Nomor ulang kolom "No"</label>
-          <label class="chk"><input type="checkbox" id="chkBlank-${p}" ${checkedBlank} /> Sertakan 3 baris kosong di atas header</label>
-          <div style="flex:1"></div>
-          <button class="btn-ok" id="btnExport-${p}">⬇ Download Excel (${cfg.label})</button>
         </div>
       </section>
 
       <section class="card hidden" id="preview-${p}">
         <h2>3. Pratinjau Hasil — ${cfg.label}</h2>
-        <p class="sub">Kolom <b>Part</b>, <b>Deskripsi</b>, <b>Nomor Referensi</b>, dan <b>Lokasi Tujuan</b> sudah terisi dari sheet referensi.</p>
 
         <div class="stats">
           <div class="pill">Total baris: <b id="stTotal-${p}">0</b></div>
@@ -839,9 +792,6 @@ class TabController {
     return null;
   }
 
-  /* ------------------------------------------------------------------
-     AUTO-FILL: Diubah Oleh ← Dibuat Oleh, Diubah Pada ← Dibuat Pada
-     ------------------------------------------------------------------ */
   autoFillChangedFromCreated(rows){
     let filledOleh = 0, filledPada = 0;
     rows.forEach(row => {
@@ -952,7 +902,6 @@ class TabController {
       rows.push(obj);
     }
 
-    /* --- ENRICHMENT #1: sheet Detail --- */
     if (detail){
       const dov = this.cfg.detailOverrides || {};
       let matched = 0, filledPart = 0, filledDesc = 0, filledExtra = 0, filledSatuan = 0;
@@ -966,7 +915,6 @@ class TabController {
         if (!row["Part"] && rec.part){ row["Part"] = rec.part; filledPart++; }
         if (!row["Deskripsi"] && rec.deskripsi){ row["Deskripsi"] = rec.deskripsi; filledDesc++; }
 
-        /* KHUSUS TAP 2 — Satuan diambil dari kolom UM sheet Detail */
         if (dov.satuanFromUM && umIdx >= 0){
           const umVal = rec.raw[umIdx];
           if (umVal !== null && umVal !== undefined && String(umVal).trim() !== ""){
@@ -1004,7 +952,6 @@ class TabController {
       this.state.detailInfo = null;
     }
 
-    /* --- ENRICHMENT #2: sheet Goods Transaction --- */
     const gt = this.detectGoodsTransactionSheet(sheetName);
     if (gt){
       const ov = this.cfg.gtOverrides || {};
@@ -1025,14 +972,11 @@ class TabController {
           filledLokasi++;
         }
 
-        /* KHUSUS TAP 2 — Status diambil dari sheet Goods Transaction */
         if (ov.statusFromGT && rec.status){
           row["Status"] = rec.status;
           filledStatus++;
         }
 
-        /* KHUSUS TAP 2 — Dibuat Pada & Dikonfirmasi Pada
-           disalin dari kolom "Diupdate Tanggal" (TANGGAL saja, tanpa jam) */
         if (ov.dateFromGT){
           const tgl = formatDateOnlyValue(rec.diupdateTanggal, this.cfg.dateFormat);
           if (tgl){
@@ -1062,7 +1006,6 @@ class TabController {
       this.state.gtInfo = null;
     }
 
-    /* --- AUTO-FILL: Diubah ← Dibuat --- */
     this.state.autoFillInfo = this.autoFillChangedFromCreated(rows);
 
     this.state.rows = rows;
@@ -1070,7 +1013,6 @@ class TabController {
     this.buildFilterOptions();
     this.applyFilter();
 
-    this.el("filter").classList.remove("hidden");
     this.el("preview").classList.remove("hidden");
   }
 
@@ -1082,7 +1024,6 @@ class TabController {
     const ov   = this.cfg.gtOverrides || {};
     const dov  = this.cfg.detailOverrides || {};
     box.innerHTML = "";
-    box.classList.remove("hidden");
 
     let html = "";
 
@@ -1093,19 +1034,16 @@ class TabController {
           <div>
             <b>Sheet Detail tidak ditemukan.</b><br>
             Kolom <b>Part</b> dan <b>Deskripsi</b> hanya diambil dari sheet utama.
-            Beri nama sheet detail Anda dengan kata "Detail" (mis. <code>Detail</code>,
-            <code>detail_part</code>, <code>DETAIL</code>, <code>Goods Transaction Detail</code>)
-            agar dilengkapi otomatis.
           </div>
         </div>`;
     } else {
       const extraHtml = info.extraCols && info.extraCols.length
-        ? `<br>Kolom tambahan dari Detail yang ikut ditampilkan: <code>${info.extraCols.map(escapeHtml).join("</code>, <code>")}</code>.`
+        ? `<br>Kolom tambahan dari Detail: <code>${info.extraCols.map(escapeHtml).join("</code>, <code>")}</code>.`
         : "";
 
       const excluded = (this.cfg.excludedDetailColumns || []);
       const excludedHtml = excluded.length
-        ? `<br><span style="color:#b45309"><b>Dikecualikan di ${escapeHtml(this.cfg.label)}:</b> <code>${excluded.map(escapeHtml).join("</code>, <code>")}</code>.</span>`
+        ? `<br><span style="color:#b45309"><b>Dikecualikan:</b> <code>${excluded.map(escapeHtml).join("</code>, <code>")}</code>.</span>`
         : "";
 
       const satuanHtml = (dov.satuanFromUM && info.filledSatuan !== undefined)
@@ -1119,12 +1057,6 @@ class TabController {
           <div>
             <b>Sheet Detail terdeteksi: <code>${escapeHtml(info.sheetName)}</code></b>
             — ${info.count.toLocaleString("id-ID")} baris referensi.
-            Kolom Part: <code>${escapeHtml(info.partCol ?? "-")}</code>,
-            Deskripsi: <code>${escapeHtml(info.descCol ?? "-")}</code>,
-            UM: <code>${escapeHtml(info.umCol ?? "-")}</code>.<br>
-            Baris utama yang cocok: <b>${info.matched.toLocaleString("id-ID")}</b>.
-            Nilai diisi ke kolom kosong: Part <b>${info.filledPart}</b>,
-            Deskripsi <b>${info.filledDesc}</b>${info.filledExtra ? `, kolom tambahan <b>${info.filledExtra}</b>` : ""}.
             ${satuanHtml}
             ${extraHtml}
             ${excludedHtml}
@@ -1137,19 +1069,16 @@ class TabController {
         <div class="info warn">
           <span class="ico">⚠️</span>
           <div>
-            <b>Sheet Goods Transaction tidak ditemukan.</b><br>
-            Kolom <b>Nomor Referensi</b> dan <b>Lokasi Tujuan</b> hanya diambil dari sheet utama
-            (header <code>Referensi</code> / <code>Lokasi Sampai</code> juga dikenali).
-            Beri nama sheet sumber dengan kata "Goods Transaction" agar dilengkapi otomatis.
+            <b>Sheet Goods Transaction tidak ditemukan.</b>
           </div>
         </div>`;
     } else {
       const gtExtra = [];
       if (ov.statusFromGT && gt.statusCol){
-        gtExtra.push(`Kolom <b>Status</b> diambil dari <code>${escapeHtml(gt.statusCol)}</code> — <b>${gt.filledStatus.toLocaleString("id-ID")}</b> baris.`);
+        gtExtra.push(`Kolom <b>Status</b> dari <code>${escapeHtml(gt.statusCol)}</code>.`);
       }
       if (ov.dateFromGT && gt.tanggalCol){
-        gtExtra.push(`Kolom <b>Dibuat Pada</b> &amp; <b>Dikonfirmasi Pada</b> disalin dari <code>${escapeHtml(gt.tanggalCol)}</code> — <b>tanggal saja, tanpa jam</b> (${gt.filledDibuat.toLocaleString("id-ID")} baris).`);
+        gtExtra.push(`Kolom <b>Dibuat Pada</b> &amp; <b>Dikonfirmasi Pada</b> dari <code>${escapeHtml(gt.tanggalCol)}</code>.`);
       }
 
       html += `
@@ -1158,13 +1087,6 @@ class TabController {
           <div>
             <b>Sheet Goods Transaction terdeteksi: <code>${escapeHtml(gt.sheetName)}</code></b>
             — ${gt.count.toLocaleString("id-ID")} baris referensi.
-            Kolom <b>Referensi</b>: <code>${escapeHtml(gt.refCol ?? "-")}</code> →
-            <b>Nomor Referensi</b>;
-            kolom <b>Lokasi Sampai</b>: <code>${escapeHtml(gt.lokasiCol ?? "-")}</code> →
-            <b>Lokasi Tujuan</b>.<br>
-            Baris utama yang cocok: <b>${gt.matched.toLocaleString("id-ID")}</b>.
-            Nilai diisi ke kolom kosong: Nomor Referensi <b>${gt.filledRef}</b>,
-            Lokasi Tujuan <b>${gt.filledLokasi}</b>.
             ${gtExtra.length ? "<br>" + gtExtra.join("<br>") : ""}
           </div>
         </div>`;
@@ -1175,9 +1097,7 @@ class TabController {
         <div class="info ok" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
           <span class="ico">🔁</span>
           <div>
-            <b>Auto-fill kolom perubahan:</b>
-            <b>Diubah Oleh</b> diisi dari <code>Dibuat Oleh</code> pada <b>${af.filledOleh.toLocaleString("id-ID")}</b> baris;
-            <b>Diubah Pada</b> diisi dari <code>Dibuat Pada</code> pada <b>${af.filledPada.toLocaleString("id-ID")}</b> baris.
+            <b>Auto-fill kolom perubahan</b> aktif.
           </div>
         </div>`;
     }
