@@ -248,6 +248,7 @@ const MAIN_COL_ALIASES = {
 const COL_ALIASES = {
   part: ["part","kode part","kode_part","kodeitem","kode item","part number","partnumber","part no","partno","item","item code"],
   deskripsi: ["deskripsi","description","desc","nama part","part name","nama item","item name","keterangan"],
+  um: ["um","uom","u m","satuan","unit measure","satuan barang"],
   nomorDokumen: ["nomor dokumen","no dokumen","nodokumen","dokumen","document number","doc no"],
   nomorReferensi: ["nomor referensi","no referensi","noreferensi","referensi","reference","ref no"],
   baris: ["baris","line","no baris","line no","line number","item line"],
@@ -291,6 +292,9 @@ const TAB_CONFIGS = {
     gtOverrides: {
       statusFromGT: true,   // Status ← kolom Status sheet Goods Transaction
       dateFromGT:   true    // Dibuat Pada & Dikonfirmasi Pada ← kolom Diupdate Tanggal (tanggal saja)
+    },
+    detailOverrides: {
+      satuanFromUM: true    // Satuan ← kolom UM sheet Detail (Goods Transaction Detail)
     }
   }
 };
@@ -451,15 +455,28 @@ class TabController {
 
     const checkedBlank = cfg.defaultBlankRows ? "checked" : "";
 
-    const overrideNote = cfg.gtOverrides
+    const overrideItems = [];
+    if (cfg.detailOverrides && cfg.detailOverrides.satuanFromUM){
+      overrideItems.push(
+        `kolom <b>Satuan</b> diambil dari kolom <code>UM</code> sheet <b>Detail</b> (Goods Transaction Detail)`
+      );
+    }
+    if (cfg.gtOverrides && cfg.gtOverrides.statusFromGT){
+      overrideItems.push(
+        `kolom <b>Status</b> diambil dari kolom <code>Status</code> sheet <b>Goods Transaction</b>`
+      );
+    }
+    if (cfg.gtOverrides && cfg.gtOverrides.dateFromGT){
+      overrideItems.push(
+        `kolom <b>Dibuat Pada</b> &amp; <b>Dikonfirmasi Pada</b> disalin dari kolom <code>Diupdate Tanggal</code> sheet <b>Goods Transaction</b> — hanya <b>tanggalnya</b> (tanpa jam)`
+      );
+    }
+    const overrideNote = overrideItems.length
       ? `<div class="info ok" style="margin-top:0">
            <span class="ico">ℹ️</span>
            <div>
              <b>Khusus ${escapeHtml(cfg.label)}:</b>
-             kolom <b>Status</b> diambil dari kolom <code>Status</code> sheet <b>Goods Transaction</b>;
-             kolom <b>Dibuat Pada</b> dan <b>Dikonfirmasi Pada</b> disalin dari kolom
-             <code>Diupdate Tanggal</code> sheet <b>Goods Transaction</b>
-             — hanya <b>tanggalnya</b> (tanpa jam).
+             ${overrideItems.join("; ")}.
            </div>
          </div>`
       : "";
@@ -645,6 +662,7 @@ class TabController {
       const idx = {
         part:    findColumnIndex(headers, COL_ALIASES.part),
         desc:    findColumnIndex(headers, COL_ALIASES.deskripsi),
+        um:      findColumnIndex(headers, COL_ALIASES.um),
         doc:     findColumnIndex(headers, COL_ALIASES.nomorDokumen),
         ref:     findColumnIndex(headers, COL_ALIASES.nomorReferensi),
         baris:   findColumnIndex(headers, COL_ALIASES.baris),
@@ -664,6 +682,7 @@ class TabController {
           raw: raw,
           part:      idx.part   >= 0 ? String(raw[idx.part]   ?? "").trim() : "",
           deskripsi: idx.desc   >= 0 ? String(raw[idx.desc]   ?? "").trim() : "",
+          um:        idx.um     >= 0 ? String(raw[idx.um]     ?? "").trim() : "",
           doc:       idx.doc    >= 0 ? String(raw[idx.doc]    ?? "").trim() : "",
           ref:       idx.ref    >= 0 ? String(raw[idx.ref]    ?? "").trim() : "",
           baris:     idx.baris  >= 0 ? String(raw[idx.baris]  ?? "").trim() : "",
@@ -694,7 +713,8 @@ class TabController {
         columnIndexes: idx,
         matchedCols: {
           part: idx.part >= 0 ? headers[idx.part] : null,
-          deskripsi: idx.desc >= 0 ? headers[idx.desc] : null
+          deskripsi: idx.desc >= 0 ? headers[idx.desc] : null,
+          um: idx.um >= 0 ? headers[idx.um] : null
         }
       };
     }
@@ -934,7 +954,9 @@ class TabController {
 
     /* --- ENRICHMENT #1: sheet Detail --- */
     if (detail){
-      let matched = 0, filledPart = 0, filledDesc = 0, filledExtra = 0;
+      const dov = this.cfg.detailOverrides || {};
+      let matched = 0, filledPart = 0, filledDesc = 0, filledExtra = 0, filledSatuan = 0;
+      const umIdx = detail.columnIndexes.um;
 
       rows.forEach(row => {
         const rec = this.lookupDetail(detail, row);
@@ -943,6 +965,15 @@ class TabController {
 
         if (!row["Part"] && rec.part){ row["Part"] = rec.part; filledPart++; }
         if (!row["Deskripsi"] && rec.deskripsi){ row["Deskripsi"] = rec.deskripsi; filledDesc++; }
+
+        /* KHUSUS TAP 2 — Satuan diambil dari kolom UM sheet Detail */
+        if (dov.satuanFromUM && umIdx >= 0){
+          const umVal = rec.raw[umIdx];
+          if (umVal !== null && umVal !== undefined && String(umVal).trim() !== ""){
+            row["Satuan"] = String(umVal).trim();
+            filledSatuan++;
+          }
+        }
 
         detail.columns.forEach((colName, ci) => {
           if (!colName) return;
@@ -963,9 +994,10 @@ class TabController {
       this.state.detailInfo = {
         sheetName: detail.sheetName,
         count: detail.records.length,
-        matched, filledPart, filledDesc, filledExtra,
+        matched, filledPart, filledDesc, filledExtra, filledSatuan,
         partCol: detail.matchedCols.part,
         descCol: detail.matchedCols.deskripsi,
+        umCol: detail.matchedCols.um,
         extraCols: extraDetailCols
       };
     } else {
@@ -1048,6 +1080,7 @@ class TabController {
     const gt   = this.state.gtInfo;
     const af   = this.state.autoFillInfo;
     const ov   = this.cfg.gtOverrides || {};
+    const dov  = this.cfg.detailOverrides || {};
     box.innerHTML = "";
     box.classList.remove("hidden");
 
@@ -1061,7 +1094,8 @@ class TabController {
             <b>Sheet Detail tidak ditemukan.</b><br>
             Kolom <b>Part</b> dan <b>Deskripsi</b> hanya diambil dari sheet utama.
             Beri nama sheet detail Anda dengan kata "Detail" (mis. <code>Detail</code>,
-            <code>detail_part</code>, <code>DETAIL</code>) agar dilengkapi otomatis.
+            <code>detail_part</code>, <code>DETAIL</code>, <code>Goods Transaction Detail</code>)
+            agar dilengkapi otomatis.
           </div>
         </div>`;
     } else {
@@ -1074,6 +1108,11 @@ class TabController {
         ? `<br><span style="color:#b45309"><b>Dikecualikan di ${escapeHtml(this.cfg.label)}:</b> <code>${excluded.map(escapeHtml).join("</code>, <code>")}</code>.</span>`
         : "";
 
+      const satuanHtml = (dov.satuanFromUM && info.filledSatuan !== undefined)
+        ? `<br>Kolom <b>Satuan</b> diambil dari <code>${escapeHtml(info.umCol ?? "-")}</code>
+           — <b>${info.filledSatuan.toLocaleString("id-ID")}</b> baris.`
+        : "";
+
       html += `
         <div class="info ok">
           <span class="ico">✅</span>
@@ -1081,10 +1120,12 @@ class TabController {
             <b>Sheet Detail terdeteksi: <code>${escapeHtml(info.sheetName)}</code></b>
             — ${info.count.toLocaleString("id-ID")} baris referensi.
             Kolom Part: <code>${escapeHtml(info.partCol ?? "-")}</code>,
-            Deskripsi: <code>${escapeHtml(info.descCol ?? "-")}</code>.<br>
+            Deskripsi: <code>${escapeHtml(info.descCol ?? "-")}</code>,
+            UM: <code>${escapeHtml(info.umCol ?? "-")}</code>.<br>
             Baris utama yang cocok: <b>${info.matched.toLocaleString("id-ID")}</b>.
             Nilai diisi ke kolom kosong: Part <b>${info.filledPart}</b>,
             Deskripsi <b>${info.filledDesc}</b>${info.filledExtra ? `, kolom tambahan <b>${info.filledExtra}</b>` : ""}.
+            ${satuanHtml}
             ${extraHtml}
             ${excludedHtml}
           </div>
@@ -1220,9 +1261,6 @@ class TabController {
     this.applyFilter();
   }
 
-  /* ------------------------------------------------------------------
-     HAPUS: baris terfilter
-     ------------------------------------------------------------------ */
   async deleteFilteredRows(){
     if (!this.state.rows.length){
       toast("Belum ada data yang dimuat.");
@@ -1249,13 +1287,11 @@ class TabController {
     const hapus = new Set(this.state.filtered);
     this.state.rows = this.state.rows.filter(r => !hapus.has(r));
 
-    /* catat jumlah yang dihapus untuk statistik */
     this.state.deletedCount = (this.state.deletedCount || 0) + jumlah;
 
     this.buildFilterOptions();
     this.applyFilter();
 
-    /* perbarui pill "Dihapus" */
     const pillDel = this.el("stDeleted");
     if (pillDel){
       pillDel.style.display = "";
@@ -1265,9 +1301,6 @@ class TabController {
     toast(`[${this.cfg.label}] ${jumlah.toLocaleString("id-ID")} baris dihapus. Sisa ${this.state.rows.length.toLocaleString("id-ID")} baris.`);
   }
 
-  /* ------------------------------------------------------------------
-     HAPUS: seluruh data (reset total)
-     ------------------------------------------------------------------ */
   async clearAllData(){
     if (!this.state.wb && !this.state.rows.length){
       toast("Belum ada data untuk dihapus.");
@@ -1291,22 +1324,18 @@ class TabController {
     this.state.baseName     = "extract";
     this.state.deletedCount = 0;
 
-    /* Reset UI input */
     this.el("file").value = "";
     this.el("sheetSelect").innerHTML = "";
     this.el("sheetBox").classList.add("hidden");
 
-    /* Reset banner info */
     const box = this.el("detailInfo");
     box.innerHTML = "";
     box.classList.add("hidden");
 
-    /* Reset filter & preview */
     this.resetFilter();
     this.el("filter").classList.add("hidden");
     this.el("preview").classList.add("hidden");
 
-    /* Reset tabel */
     this.el("thead").innerHTML = "";
     this.el("tbody").innerHTML = "";
     this.el("emptyMsg").classList.add("hidden");
